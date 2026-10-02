@@ -50,8 +50,27 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${GITHUB_REF_NAME#otmux/v}"
+          # Release notes: this version's section of CHANGELOG.md, then how
+          # to install.
+          awk -v v="$version" 'index($0, "## [" v "]") == 1 {f=1; next} /^## \[/ {if (f) exit} f' CHANGELOG.md |
+            grep -v '^\[.*\]: ' | sed '/./,$!d' > notes.md
+          [ -s notes.md ] || echo "otmux $version" > notes.md
+          cat >> notes.md <<EOF
+
+          ## Install
+
+          **Windows**, in PowerShell:
+
+          \`\`\`powershell
+          irm https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/otmux/install.ps1 | iex
+          \`\`\`
+
+          Or download the file for your platform below; \`checksums.txt\` has their SHA-256 sums.
+          On macOS and Linux, \`chmod +x\` the file and put it on your PATH as \`otmux\`.
+          EOF
+          sed -i 's/^          //' notes.md
           gh release create "$GITHUB_REF_NAME" dist/* \
-            --title "otmux $version" --generate-notes --latest
+            --title "otmux $version" --notes-file notes.md --latest
 
       - name: update the rolling otmux/latest release
         shell: bash

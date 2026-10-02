@@ -1,5 +1,10 @@
 # otmux
 
+[![otmux CI](https://github.com/vamsikartik01/osmite-RnD/actions/workflows/otmux-ci.yml/badge.svg)](https://github.com/vamsikartik01/osmite-RnD/actions/workflows/otmux-ci.yml)
+[![Latest otmux release](https://img.shields.io/github/v/release/vamsikartik01/osmite-RnD?filter=otmux%2Fv*&label=otmux)](https://github.com/vamsikartik01/osmite-RnD/releases)
+[![Go](https://img.shields.io/github/go-mod/go-version/vamsikartik01/osmite-RnD?filename=otmux%2Fgo.mod)](go.mod)
+[![License: MIT](https://img.shields.io/github/license/vamsikartik01/osmite-RnD)](../LICENSE)
+
 A terminal workspace for developers. Workspaces, tabs and split panes keep
 running when you close the terminal, and you can attach again from anywhere.
 Drive it with tmux-style keys, the mouse, or a searchable command palette.
@@ -7,8 +12,8 @@ Windows first, with Linux and macOS from the same codebase.
 
 > **Version 1.0.0**: the first release. Workspaces, tabs, split panes,
 > detach/reattach, the watch list for coding agents, layouts, themes and
-> settings all work on Windows; Linux and macOS build from the same code and
-> run the same tests in CI. See the [roadmap](docs/roadmap.md) for what's next.
+> settings all work on Windows; Linux and macOS builds are published from the
+> same code. See the [changelog](CHANGELOG.md) and the [roadmap](docs/roadmap.md).
 
 ## Install
 

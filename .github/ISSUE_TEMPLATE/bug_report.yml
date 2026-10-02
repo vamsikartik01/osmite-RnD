@@ -1,0 +1,55 @@
+name: Bug report
+description: Something in otmux doesn't work as it should
+labels: [bug, otmux]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report this. For security problems, please
+        [report privately](https://github.com/vamsikartik01/osmite-RnD/security/advisories/new) instead.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `otmux`
+        2. Press ctrl+b v
+        3. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: otmux version
+      description: The output of `otmux version`.
+      placeholder: otmux 1.0.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [Windows, macOS, Linux]
+    validations:
+      required: true
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal
+      description: The terminal otmux runs in.
+      placeholder: Windows Terminal 1.23, iTerm2, GNOME Terminal, ...
+  - type: textarea
+    id: log
+    attributes:
+      label: Daemon log
+      description: |
+        If relevant, the end of the daemon log: `%LOCALAPPDATA%\otmux\otmux.log` on Windows,
+        `$XDG_RUNTIME_DIR/otmux/otmux.log` or `/tmp/otmux-$UID/otmux.log` elsewhere.
+      render: text

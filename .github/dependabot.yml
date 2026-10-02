@@ -1,0 +1,19 @@
+# Keeps dependencies current: weekly pull requests for otmux's Go modules and
+# for the GitHub Actions used by the workflows.
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /otmux
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "otmux"
+    groups:
+      go-modules:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "repo"

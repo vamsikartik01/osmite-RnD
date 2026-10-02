@@ -3,12 +3,16 @@
 Thanks for helping out. Each project has its own README with build and test
 instructions; this file covers what is common to the whole repo.
 
+Please follow the [code of conduct](CODE_OF_CONDUCT.md), and report security
+problems privately as described in [SECURITY.md](SECURITY.md).
+
 ## Workflow
 
 1. Open an issue first for anything bigger than a small fix, so we can agree on
    the approach.
 2. Branch from `main`, keep the change focused on one project where possible.
-3. Make sure that project's tests pass locally (see its README).
+3. Make sure that project's tests pass locally (see its README), and add
+   user-facing changes to its `CHANGELOG.md` under *Unreleased*.
 4. Open a pull request. CI runs only for the projects you touched.
 
 ## Adding a new project

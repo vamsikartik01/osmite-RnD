@@ -1,0 +1,21 @@
+name: Feature request
+description: Suggest something otmux could do
+labels: [enhancement, otmux]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What would you like to do?
+      description: The problem or workflow, more than a specific solution.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: How could otmux help?
+      description: Your idea for it, if you have one.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: How you handle it today, or how other tools (tmux, Zellij, ...) do it.
