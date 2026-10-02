@@ -7,6 +7,22 @@ All notable changes to otmux are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-10-02
+
+### Changed
+
+- The WATCH list shows each tab's agent (Claude, Codex, ...) and workspace
+  under its name, and workspaces show their folder. Pane titles name the
+  agent; its status shows in the sidebar and tab bar.
+
+### Fixed
+
+- Smoother screens, most of all in the browser: a program's screen update is
+  sent whole instead of one piece at a time, so it is never drawn half done,
+  and programs that support synchronized updates now use them.
+- Scrolling back with the wheel or a swipe keeps up instead of lagging behind.
+- A tab no longer flashes as working when an agent redraws once after a click.
+
 ## [1.3.0] - 2026-10-02
 
 ### Added
@@ -136,7 +152,8 @@ published from the same code.
 - **Install**: a one-line PowerShell installer and fixed download links to
   the newest version.
 
-[Unreleased]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.3.0...HEAD
+[Unreleased]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.3.1...HEAD
+[1.3.1]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.3.0...otmux/v1.3.1
 [1.3.0]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.2.0...otmux/v1.3.0
 [1.2.0]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.4...otmux/v1.2.0
 [1.1.4]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.3...otmux/v1.1.4
