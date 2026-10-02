@@ -7,6 +7,13 @@ All notable changes to otmux are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Opening a workspace in a second place (a browser on your phone, another
+  terminal) no longer resizes it everywhere. The workspace keeps the size of
+  the client that opened it first, then of whichever one you last typed in;
+  the others watch.
+
 ## [1.3.2] - 2026-10-02
 
 ### Added

@@ -112,11 +112,12 @@ func TestEndToEnd(t *testing.T) {
 }
 
 type testClient struct {
-	conn    *protocol.Conn
-	frames  chan protocol.Frame
-	screen  map[uint32]*mirror
-	state   protocol.State
-	history protocol.History
+	conn      *protocol.Conn
+	frames    chan protocol.Frame
+	screen    map[uint32]*mirror
+	state     protocol.State
+	history   protocol.History
+	snapshots int
 }
 
 // mirror rebuilds pane text from snapshots and output, like the real client.
@@ -139,9 +140,14 @@ func attachRaw(t *testing.T, sock string) *protocol.Conn {
 
 func attach(t *testing.T, sock string) *testClient {
 	t.Helper()
+	return attachSized(t, sock, 100, 30)
+}
+
+func attachSized(t *testing.T, sock string, cols, rows int) *testClient {
+	t.Helper()
 	conn := attachRaw(t, sock)
 	c := &testClient{conn: conn, frames: make(chan protocol.Frame, 1024), screen: map[uint32]*mirror{}}
-	c.send(t, protocol.TypeHello, protocol.Hello{Version: protocol.Version, Workspace: "e2e", Cols: 100, Rows: 30})
+	c.send(t, protocol.TypeHello, protocol.Hello{Version: protocol.Version, Workspace: "e2e", Cols: cols, Rows: rows})
 	go func() {
 		defer close(c.frames)
 		for {
@@ -186,6 +192,7 @@ func (c *testClient) apply(t *testing.T, f protocol.Frame) {
 	case protocol.TypeSnapshot:
 		var s protocol.Snapshot
 		if f.Decode(&s) == nil {
+			c.snapshots++
 			m := &mirror{}
 			m.text.WriteString(s.Data)
 			c.screen[s.Pane] = m
@@ -309,5 +316,49 @@ func TestSynchronizedUpdateArrivesWhole(t *testing.T) {
 		case <-timeout:
 			t.Fatal("timed out waiting for the update")
 		}
+	}
+}
+
+// TestSizeFollowsTyping attaches a big client and then a small one: the
+// workspace keeps the big size until someone types in the small one, and
+// commands that don't change the layout send no fresh snapshots.
+func TestSizeFollowsTyping(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("needs a POSIX shell")
+	}
+	sock := filepath.Join(shortTempDir(t), "t.sock")
+	t.Setenv("OTMUX_SOCKET", sock)
+	t.Setenv("OTMUX_CONFIG", filepath.Join(t.TempDir(), "config.json"))
+	t.Setenv("OTMUX_SHELL", "/bin/sh")
+	go func() { _ = daemon.Run() }()
+	t.Cleanup(func() {
+		k := attachRaw(t, sock)
+		_ = k.Send(protocol.TypeCommand, protocol.Command{Action: protocol.ActionKillServer})
+	})
+
+	big := attachSized(t, sock, 100, 30)
+	pane := big.waitState(t, func(s protocol.State) bool { return len(s.Panes) == 1 }).ActivePane
+	bigW := big.state.Panes[0].W
+
+	small := attachSized(t, sock, 60, 20)
+	small.waitState(t, func(s protocol.State) bool { return len(s.Panes) == 1 })
+	if w := small.state.Panes[0].W; w != bigW {
+		t.Fatalf("attaching a second client resized the workspace: width %d, want %d", w, bigW)
+	}
+
+	typeLine(t, small, pane, "echo from-small")
+	small.waitScreen(t, pane, func(s string) bool { return strings.Count(s, "from-small") >= 2 })
+	big.waitState(t, func(s protocol.State) bool { return len(s.Panes) == 1 && s.Panes[0].W < bigW })
+	typeLine(t, big, pane, "echo from-big")
+	big.waitState(t, func(s protocol.State) bool { return len(s.Panes) == 1 && s.Panes[0].W == bigW })
+	big.waitScreen(t, pane, func(s string) bool { return strings.Count(s, "from-big") >= 2 })
+
+	// Focusing the pane that's already focused redraws nothing.
+	before := big.snapshots
+	big.send(t, protocol.TypeCommand, protocol.Command{Action: protocol.ActionFocusPane, Arg: fmt.Sprint(pane)})
+	typeLine(t, big, pane, "echo after-focus")
+	big.waitScreen(t, pane, func(s string) bool { return strings.Count(s, "after-focus") >= 2 })
+	if big.snapshots != before {
+		t.Fatalf("%d snapshots for a command that changed nothing", big.snapshots-before)
 	}
 }

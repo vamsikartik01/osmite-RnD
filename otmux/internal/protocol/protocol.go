@@ -67,6 +67,12 @@ type Hello struct {
 	Dir       string `json:"dir,omitempty"` // client's working directory, for new workspaces
 	Cols      int    `json:"cols"`
 	Rows      int    `json:"rows"`
+	// Scrollback asks for up to this many lines of history in each Snapshot,
+	// for clients that scroll back themselves (browsers). A client that sets
+	// it also keeps every visible pane's screen current from Output, so the
+	// daemon only sends a pane's Snapshot when the client has no copy of it
+	// at its current size.
+	Scrollback int `json:"scrollback,omitempty"`
 }
 
 // Welcome acknowledges a Hello. If Error is set the daemon closes the
@@ -284,6 +290,11 @@ type Snapshot struct {
 	CursorX      int    `json:"cursor_x"`
 	CursorY      int    `json:"cursor_y"`
 	CursorHidden bool   `json:"cursor_hidden,omitempty"`
+	// Scrollback is how many history lines Data starts with. When it is set,
+	// Data is those lines and then the screen's, separated by CRLF: written
+	// to a blank terminal of Cols x Rows it leaves the history in the
+	// terminal's own scrollback and the screen on screen.
+	Scrollback int `json:"scrollback,omitempty"`
 }
 
 // Bye tells the client the daemon is ending the connection, and why.

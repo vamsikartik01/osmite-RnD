@@ -20,9 +20,9 @@ type Workspace struct {
 	lastTab uint32 // tab ID, for last-tab
 	clients map[*client]struct{}
 
-	// Size of the most recently resized client's terminal. With several
-	// clients attached, the latest one wins (like tmux's "latest" option).
+	// The workspace's size: its driver's terminal (see view.go).
 	cols, rows int
+	driver     *client
 }
 
 // Tab is a set of panes arranged by a split tree.

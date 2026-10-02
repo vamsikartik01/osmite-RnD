@@ -127,10 +127,15 @@ type client struct {
 
 	historyDue   map[uint32]*Pane // scrollback views to redraw; see queueHistory
 	historyArmed bool
+
+	scrollback  int                 // history lines wanted in snapshots (Hello.Scrollback)
+	keepsCopies bool                // keeps visible panes current from Output; see needsSnapshot
+	shown       map[uint32]paneSize // panes the client has a current copy of
 }
 
 func (s *Server) newClient(conn *protocol.Conn, h protocol.Hello) *client {
-	c := &client{conn: conn, out: make(chan []byte, clientQueue), dir: h.Dir, cols: h.Cols, rows: h.Rows, scroll: map[uint32]int{}, historyDue: map[uint32]*Pane{}}
+	c := &client{conn: conn, out: make(chan []byte, clientQueue), dir: h.Dir, cols: h.Cols, rows: h.Rows, scroll: map[uint32]int{}, historyDue: map[uint32]*Pane{},
+		scrollback: h.Scrollback, shown: map[uint32]paneSize{}}
 	s.writers.Add(1)
 	go func() {
 		defer s.writers.Done()
@@ -232,6 +237,9 @@ func (s *Server) serve(conn *protocol.Conn, remote bool) {
 	}
 
 	c := s.newClient(conn, hello)
+	// The terminal client keeps every visible pane current; browsers say so
+	// by asking for scrollback (older portals rebuild panes from snapshots).
+	c.keepsCopies = !remote || hello.Scrollback > 0
 	s.mu.Lock()
 	err = s.attach(c, hello)
 	if err != nil {
@@ -254,7 +262,7 @@ func (s *Server) serve(conn *protocol.Conn, remote bool) {
 
 	s.mu.Lock()
 	if c.ws != nil {
-		delete(c.ws.clients, c)
+		s.leave(c)
 		s.broadcastStates()
 	}
 	c.close()
@@ -357,11 +365,14 @@ func (s *Server) createWorkspace(name, dir string, cols, rows int) (*Workspace, 
 // the full view.
 func (s *Server) join(c *client, ws *Workspace) {
 	if c.ws != nil {
-		delete(c.ws.clients, c)
+		s.leave(c)
 	}
 	c.ws = ws
 	ws.clients[c] = struct{}{}
-	s.resize(ws, c.cols, c.rows)
+	if ws.driver == nil {
+		ws.driver = c
+	}
+	s.resize(ws, ws.driver.cols, ws.driver.rows)
 	s.broadcastStates() // client counts and workspace lists changed everywhere
 	s.sendView(c)
 }
@@ -447,6 +458,7 @@ func (s *Server) handle(c *client, f protocol.Frame) {
 			return
 		}
 		if in.Key != nil || in.Paste != "" {
+			s.drive(c)             // the workspace takes the size of where you type
 			delete(c.scroll, p.id) // typing returns to the live screen
 			delete(c.historyDue, p.id)
 			if !p.typed {
@@ -459,8 +471,9 @@ func (s *Server) handle(c *client, f protocol.Frame) {
 		var r protocol.Resize
 		if f.Decode(&r) == nil {
 			c.cols, c.rows = r.Cols, r.Rows
-			s.resize(ws, r.Cols, r.Rows)
-			s.broadcastView(ws)
+			if ws.driver == c && s.resize(ws, r.Cols, r.Rows) {
+				s.broadcastView(ws)
+			}
 		}
 	case protocol.TypeCommand:
 		var cmd protocol.Command
@@ -711,14 +724,16 @@ func (s *Server) unzoom(ws *Workspace, t *Tab) {
 	}
 }
 
-func (s *Server) resize(ws *Workspace, cols, rows int) {
+// resize gives ws a new size and reports whether it changed.
+func (s *Server) resize(ws *Workspace, cols, rows int) bool {
 	if cols <= 0 || rows <= 0 || cols == ws.cols && rows == ws.rows {
-		return
+		return false
 	}
 	ws.cols, ws.rows = cols, rows
 	for _, t := range ws.tabs {
 		t.relayout(ws.area())
 	}
+	return true
 }
 
 // --- tabs and panes ----------------------------------------------------------
@@ -913,7 +928,7 @@ func (s *Server) setRemoteStatus(st protocol.RemoteStatus) {
 func (s *Server) broadcastState(ws *Workspace) {
 	st := s.state(ws)
 	for c := range ws.clients {
-		c.queueJSON(protocol.TypeState, st)
+		s.sendState(c, st)
 	}
 }
 
@@ -925,24 +940,25 @@ func (s *Server) broadcastStates() {
 	}
 }
 
-// sendView sends c the layout and a snapshot of every visible pane.
+// sendView sends c the layout and a snapshot of every visible pane it has
+// no current copy of.
 func (s *Server) sendView(c *client) {
 	ws := c.ws
 	s.flushWorkspace(ws)
-	c.scroll = map[uint32]int{} // fresh snapshots replace any history view
-	clear(c.historyDue)
 	if t := ws.activeTab(); t != nil {
 		t.attention = false // the user is looking at it now
 	}
-	c.queueJSON(protocol.TypeState, s.state(ws))
+	s.sendState(c, s.state(ws))
 	t := ws.activeTab()
 	if t == nil {
 		return
 	}
 	rects, _ := t.view(ws.area())
 	for id := range rects {
-		if p := t.panes[id]; p != nil {
-			c.queueJSON(protocol.TypeSnapshot, p.snapshot())
+		if p := t.panes[id]; p != nil && c.needsSnapshot(p) {
+			delete(c.scroll, id) // a fresh snapshot replaces any history view
+			delete(c.historyDue, id)
+			c.queueJSON(protocol.TypeSnapshot, p.snapshotWithHistory(c.scrollback))
 		}
 	}
 }
