@@ -17,6 +17,10 @@
 - [x] Welcome splash in fresh tabs
 - [x] End-to-end tests driving a real daemon, shell, PTY and the real binary
 
+## 1.1.0
+
+- [x] Automatic updates, with Settings › Updates (on / off, update now) and `otmux update`
+
 ## Next
 
 - [ ] Copy mode with vi keys, for keyboard-only scrollback and selection

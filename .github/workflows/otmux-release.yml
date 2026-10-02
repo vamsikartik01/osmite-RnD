@@ -83,8 +83,8 @@ jobs:
           notes="Always the newest otmux; currently **$version** ([release notes](https://github.com/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME)). The file names here never change, so links to them always download the latest version."
           if gh release view otmux/latest >/dev/null 2>&1; then
             gh release edit otmux/latest --title "otmux (latest: $version)" --notes "$notes" --latest=false
-            gh release upload otmux/latest dist/otmux-* dist/checksums.txt --clobber
+            gh release upload otmux/latest dist/otmux-* dist/checksums.txt dist/version.txt --clobber
           else
-            gh release create otmux/latest dist/otmux-* dist/checksums.txt \
+            gh release create otmux/latest dist/otmux-* dist/checksums.txt dist/version.txt \
               --title "otmux (latest: $version)" --notes "$notes" --latest=false
           fi

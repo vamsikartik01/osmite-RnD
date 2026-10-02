@@ -21,11 +21,12 @@ const (
 	secWorkspaces = iota
 	secAppearance
 	secKeys
+	secUpdates
 	secAbout
 	numSections
 )
 
-var sectionNames = [numSections]string{"Workspaces", "Appearance", "Keys", "About"}
+var sectionNames = [numSections]string{"Workspaces", "Appearance", "Keys", "Updates", "About"}
 
 var layoutLabels = map[string]string{
 	config.LayoutSidebar: "Sidebar",
@@ -144,6 +145,24 @@ func (c *Client) settingsRows(sec int) []settingsRow {
 				return keys.Action{}, false
 			}})
 		}
+	case secUpdates:
+		state := "on"
+		if !c.cfg.AutoUpdateOn() {
+			state = "off"
+		}
+		rows = append(rows, settingsRow{left: "Auto update", right: state, run: func(c *Client) (keys.Action, bool) {
+			c.cfg.SetAutoUpdate(!c.cfg.AutoUpdateOn())
+			c.saveConfig()
+			return keys.Action{}, false
+		}})
+		label := "Update now"
+		if c.updateBusy {
+			label = "Update now  (checking…)"
+		}
+		rows = append(rows, settingsRow{left: label, run: func(c *Client) (keys.Action, bool) {
+			go c.checkUpdates(true)
+			return keys.Action{}, false
+		}})
 	}
 	return rows
 }
@@ -169,6 +188,8 @@ func (c *Client) settingsInfo(sec int) []string {
 			"The prefix starts every shortcut.",
 			"Press " + p + " to see the key guide, " + p + " Space for all commands.",
 		}
+	case secUpdates:
+		return c.updateInfoLines()
 	case secAbout:
 		return []string{
 			"otmux " + version.Version,
@@ -397,8 +418,10 @@ func (c *Client) drawSettings(s uv.Screen, st *settings) (int, int) {
 	put(s, cx, y, sectionNames[st.section], uv.Style{Fg: t.Text, Bg: t.Surface, Attrs: uv.AttrBold})
 	y += 2
 	for _, line := range c.settingsInfo(st.section) {
-		put(s, cx, y, runewidth.Truncate(line, cw, "…"), uv.Style{Fg: t.Muted, Bg: t.Surface})
-		y++
+		for _, part := range wrap(line, cw) {
+			put(s, cx, y, part, uv.Style{Fg: t.Muted, Bg: t.Surface})
+			y++
+		}
 	}
 	y++
 
@@ -501,4 +524,34 @@ func boolAttr(on bool, a uint8) uint8 {
 		return a
 	}
 	return 0
+}
+
+// wrap breaks text into lines of at most width cells, at spaces where it
+// can. An empty line stays one empty line.
+func wrap(text string, width int) []string {
+	if width <= 0 || runewidth.StringWidth(text) <= width {
+		return []string{text}
+	}
+	var lines []string
+	line := ""
+	for _, word := range strings.Fields(text) {
+		switch {
+		case line == "":
+			line = word
+		case runewidth.StringWidth(line+" "+word) <= width:
+			line += " " + word
+		default:
+			lines = append(lines, line)
+			line = word
+		}
+		for runewidth.StringWidth(line) > width { // a single over-long word
+			cut := runewidth.Truncate(line, width, "")
+			lines = append(lines, cut)
+			line = strings.TrimPrefix(line, cut)
+		}
+	}
+	if line != "" {
+		lines = append(lines, line)
+	}
+	return lines
 }

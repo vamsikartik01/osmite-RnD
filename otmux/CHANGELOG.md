@@ -7,6 +7,23 @@ All notable changes to otmux are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-02
+
+### Added
+
+- **Automatic updates.** otmux checks for a new release once a day, in the
+  background, downloads it, verifies it against the release's SHA-256
+  checksums, and swaps it in. Running shells are never restarted: the new
+  version starts the next time you run otmux, and a note in the status bar
+  says so. Copies installed by a package manager, or in folders you can't
+  write to, aren't touched.
+- **Settings › Updates**: turn automatic updates on or off, update now, and
+  see the installed and latest versions.
+- `otmux update` updates from the command line; `OTMUX_NO_UPDATE=1` turns
+  automatic updates off.
+- Releases publish `version.txt`, which running copies use to find out about
+  new versions.
+
 ## [1.0.0] - 2026-10-02
 
 The first release. Windows is the primary platform; Linux and macOS builds are
@@ -41,5 +58,6 @@ published from the same code.
 - **Install**: a one-line PowerShell installer and fixed download links to
   the newest version.
 
-[Unreleased]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.0.0...HEAD
+[Unreleased]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.0...HEAD
+[1.1.0]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.0.0...otmux/v1.1.0
 [1.0.0]: https://github.com/vamsikartik01/osmite-RnD/releases/tag/otmux/v1.0.0

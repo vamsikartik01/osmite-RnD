@@ -38,8 +38,10 @@ type Config struct {
 	Layout string `json:"layout,omitempty"` // empty means LayoutSidebar
 	// TerminalColors keeps panes in the terminal's own colours instead of
 	// the theme's.
-	TerminalColors bool      `json:"terminal_colors,omitempty"`
-	Workspaces     []Profile `json:"workspaces,omitempty"`
+	TerminalColors bool `json:"terminal_colors,omitempty"`
+	// AutoUpdate is nil for the default (on).
+	AutoUpdate *bool     `json:"auto_update,omitempty"`
+	Workspaces []Profile `json:"workspaces,omitempty"`
 
 	// Sidebar is the setting older versions wrote; false now means two bars.
 	Sidebar *bool `json:"sidebar,omitempty"`
@@ -137,6 +139,12 @@ func (c *Config) LayoutName() string {
 	}
 	return LayoutSidebar
 }
+
+// AutoUpdateOn reports whether otmux updates itself; on unless turned off.
+func (c *Config) AutoUpdateOn() bool { return c.AutoUpdate == nil || *c.AutoUpdate }
+
+// SetAutoUpdate turns automatic updates on or off.
+func (c *Config) SetAutoUpdate(on bool) { c.AutoUpdate = &on }
 
 // SetLayout chooses a layout.
 func (c *Config) SetLayout(l string) {

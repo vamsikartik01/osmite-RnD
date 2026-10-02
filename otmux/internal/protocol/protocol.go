@@ -74,6 +74,9 @@ type Hello struct {
 type Welcome struct {
 	Version int    `json:"version"`
 	Error   string `json:"error,omitempty"`
+	// Daemon is the daemon's otmux version, e.g. "1.0.0"; clients use it to
+	// tell when an update is waiting for the daemon to restart.
+	Daemon string `json:"daemon,omitempty"`
 }
 
 // Key is a keyboard event, independent of any terminal encoding. The daemon

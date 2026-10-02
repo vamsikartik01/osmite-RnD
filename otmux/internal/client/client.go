@@ -23,6 +23,7 @@ import (
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/keys"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/platform"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/protocol"
+	"github.com/vamsikartik01/osmite-RnD/otmux/internal/update"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/vtx"
 )
 
@@ -58,10 +59,16 @@ type Client struct {
 	history    map[uint32]*histView // panes scrolled back with the wheel
 	overlay    *overlay
 	settings   *settings
-	drag       *protocol.Divider // divider being dragged with the mouse
-	sel        *selection        // mouse text selection
-	hits       []hit             // clickable status bar regions, set by render
-	byeReason  string
+
+	// Updates.
+	updateInfo   update.State
+	updateBusy   bool
+	updateBadge  string            // short note for the status bar, e.g. "1.1.0 installed · restart to finish"
+	updateStatus string            // longer note for Settings › Updates
+	drag         *protocol.Divider // divider being dragged with the mouse
+	sel          *selection        // mouse text selection
+	hits         []hit             // clickable status bar regions, set by render
+	byeReason    string
 
 	dirty chan struct{}
 	done  chan struct{}
@@ -158,6 +165,7 @@ func Attach(opts Options) (string, error) {
 		return "", err
 	}
 
+	c.startUpdates(w.Daemon)
 	go c.readLoop()
 	go c.renderLoop()
 	reason := c.eventLoop()
@@ -433,6 +441,14 @@ func (c *Client) run(act keys.Action, k uv.KeyPressEvent) (string, bool) {
 		c.openOverlay(c.workspaceOverlay())
 	case keys.ActionSettings:
 		c.openSettings()
+		if act.Arg == "updates" {
+			c.mu.Lock()
+			if c.settings != nil {
+				c.settings.section, c.settings.inMenu = secUpdates, false
+				c.settings.sel[secUpdates] = 1 // "Update now"
+			}
+			c.mu.Unlock()
+		}
 	case keys.ActionToggleSidebar:
 		c.mu.Lock()
 		if c.cfg.LayoutName() == config.LayoutSidebar {

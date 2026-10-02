@@ -21,6 +21,7 @@ import (
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/layout"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/platform"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/protocol"
+	"github.com/vamsikartik01/osmite-RnD/otmux/internal/version"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/vtx"
 )
 
@@ -264,7 +265,7 @@ func (s *Server) attach(c *client, h protocol.Hello) error {
 			return err
 		}
 	}
-	c.queueJSON(protocol.TypeWelcome, protocol.Welcome{Version: protocol.Version})
+	c.queueJSON(protocol.TypeWelcome, protocol.Welcome{Version: protocol.Version, Daemon: version.Version})
 	s.join(c, ws)
 	return nil
 }

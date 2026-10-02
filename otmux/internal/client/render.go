@@ -376,37 +376,59 @@ func (c *Client) drawRight(s uv.Screen, x, y int, showZoom bool) {
 	label := uv.Style{Fg: t.Muted, Bg: t.Bar}
 	prefix := keys.Label(c.keys.Keymap().Prefix)
 	// Right side, built as segments and placed only if they fit.
+	// Each group is one item plus its trailing gap. When space runs out,
+	// the lowest-priority groups are dropped first: the shortcut hint, then
+	// the clock, then detach; an update notice and the zoom badge stay longest.
 	type seg struct {
 		text  string
 		style uv.Style
 		act   *keys.Action // clickable
 	}
-	var right []seg
-	if showZoom && c.state.Zoomed {
-		right = append(right, seg{text: " ZOOM ", style: uv.Style{Fg: hex(0x1c1c1e), Bg: t.Attn, Attrs: uv.AttrBold}}, seg{text: "   ", style: bar})
+	type group struct {
+		prio int
+		segs []seg
 	}
-	right = append(right, seg{text: " detach ", style: uv.Style{Fg: t.Text, Bg: t.Raised}, act: &keys.Action{Name: keys.ActionDetach}}, seg{text: "   ", style: bar})
-	right = append(right, seg{text: prefix, style: key}, seg{text: " for shortcuts   ", style: label})
-	right = append(right, seg{text: time.Now().Format("15:04") + " ", style: uv.Style{Fg: t.Text, Bg: t.Bar}})
-	// Drop segments from the front until the right side fits beside the tabs;
-	// the clock goes last.
-	for len(right) > 0 {
+	gap := seg{text: "   ", style: bar}
+	var groups []group
+	if showZoom && c.state.Zoomed {
+		groups = append(groups, group{5, []seg{{text: " ZOOM ", style: uv.Style{Fg: hex(0x1c1c1e), Bg: t.Attn, Attrs: uv.AttrBold}}, gap}})
+	}
+	if c.updateBadge != "" {
+		groups = append(groups, group{4, []seg{{text: " ↑ " + c.updateBadge + " ", style: uv.Style{Fg: t.OnAccent, Bg: t.Accent},
+			act: &keys.Action{Name: keys.ActionSettings, Arg: "updates"}}, gap}})
+	}
+	groups = append(groups,
+		group{3, []seg{{text: " detach ", style: uv.Style{Fg: t.Text, Bg: t.Raised}, act: &keys.Action{Name: keys.ActionDetach}}, gap}},
+		group{1, []seg{{text: prefix, style: key}, {text: " for shortcuts   ", style: label}}},
+		group{2, []seg{{text: time.Now().Format("15:04") + " ", style: uv.Style{Fg: t.Text, Bg: t.Bar}}}},
+	)
+	width := func() int {
 		w := 0
-		for _, sg := range right {
-			w += runewidth.StringWidth(sg.text)
-		}
-		if c.cols-w-1 > x+1 {
-			rx := c.cols - w - 1
-			for _, sg := range right {
-				x0 := rx
-				rx = put(s, rx, y, sg.text, sg.style)
-				if sg.act != nil {
-					c.hits = append(c.hits, hit{x0, rx, y, *sg.act})
-				}
+		for _, g := range groups {
+			for _, sg := range g.segs {
+				w += runewidth.StringWidth(sg.text)
 			}
-			break
 		}
-		right = right[1:]
+		return w
+	}
+	for len(groups) > 0 && c.cols-width()-1 <= x+1 {
+		low := 0
+		for i, g := range groups {
+			if g.prio < groups[low].prio {
+				low = i
+			}
+		}
+		groups = append(groups[:low], groups[low+1:]...)
+	}
+	rx := c.cols - width() - 1
+	for _, g := range groups {
+		for _, sg := range g.segs {
+			x0 := rx
+			rx = put(s, rx, y, sg.text, sg.style)
+			if sg.act != nil {
+				c.hits = append(c.hits, hit{x0, rx, y, *sg.act})
+			}
+		}
 	}
 }
 

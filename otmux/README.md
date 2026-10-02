@@ -70,6 +70,7 @@ otmux ls                list workspaces                           (alias: list)
 otmux kill <name>       close a workspace and every shell in it
 otmux kill-server       stop the daemon and every shell
 otmux keys              print all key bindings
+otmux update            update to the latest release
 otmux version
 ```
 
@@ -229,11 +230,29 @@ between the menu and the list, and `enter` to choose.
   text on the main backgrounds, 4.5:1 for secondary text, and 3:1 for ANSI
   colours.
 - **Keys:** choose the prefix: `ctrl+b`, `ctrl+a`, `ctrl+space` or `ctrl+g`.
+- **Updates:** automatic updates on or off, *Update now*, and the installed
+  and latest versions. See [Updates](#updates).
 - **About:** the version, and where the settings, socket and log are.
 
 Settings are stored as JSON in `%AppData%\otmux\config.json` on Windows,
 `~/Library/Application Support/otmux/config.json` on macOS, and
 `~/.config/otmux/config.json` on Linux (`OTMUX_CONFIG` overrides the path).
+
+## Updates
+
+otmux keeps itself up to date. Once a day it checks the latest release in the
+background, downloads the new version, verifies it against the release's
+SHA-256 checksums, and swaps it in for the program file. **Nothing is
+restarted**: your shells keep running, and the status bar shows
+`↑ 1.2.0 installed · restart to finish`. The new version starts the next time
+you run `otmux`; run `otmux kill-server` first if you also want the
+background service on the new version (that closes running shells).
+
+- Turn it off in **Settings › Updates**, or with `OTMUX_NO_UPDATE=1`.
+- Update straight away with **Settings › Updates › Update now** or
+  `otmux update`.
+- Copies installed by a package manager, or in a folder you can't write to,
+  never update themselves.
 
 ## Environment
 
@@ -241,6 +260,7 @@ Settings are stored as JSON in `%AppData%\otmux\config.json` on Windows,
 |---|---|
 | `OTMUX_PREFIX` | prefix key, e.g. `ctrl+a`; overrides the one chosen in settings |
 | `OTMUX_CONFIG` | path of the settings file |
+| `OTMUX_NO_UPDATE` | set to anything to turn automatic updates off |
 | `OTMUX_SHELL` | shell for new panes (default: `pwsh`, then `powershell`, then `cmd` on Windows; `$SHELL` elsewhere) |
 | `OTMUX_SOCKET` | daemon socket path, for running an isolated daemon while developing |
 

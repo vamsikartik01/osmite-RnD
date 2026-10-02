@@ -4,12 +4,14 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
 	"net"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -20,6 +22,7 @@ import (
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/keys"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/platform"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/protocol"
+	"github.com/vamsikartik01/osmite-RnD/otmux/internal/update"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/version"
 )
 
@@ -33,6 +36,7 @@ Usage:
   otmux kill <name>         close a workspace and its shells
   otmux kill-server         stop the daemon and every shell
   otmux keys                list key bindings
+  otmux update              update otmux to the latest release
   otmux version
 
 Inside otmux, press %[1]s then:
@@ -88,6 +92,8 @@ func run(args []string) error {
 		return oneShot(protocol.Command{Action: protocol.ActionKillWorkspace, Arg: arg()})
 	case "kill-server":
 		return oneShot(protocol.Command{Action: protocol.ActionKillServer})
+	case "update":
+		return selfUpdate()
 	case "keys":
 		printKeys()
 		return nil
@@ -127,6 +133,31 @@ func attach(workspace, mode string) error {
 	if reason != "" {
 		fmt.Printf("[%s]\n", reason)
 	}
+	return nil
+}
+
+// selfUpdate installs the latest release over this program.
+func selfUpdate() error {
+	exe, err := update.Executable()
+	if err != nil {
+		return err
+	}
+	fmt.Println("Checking for updates...")
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	defer cancel()
+	r, err := update.Run(ctx, exe, version.Version)
+	if err != nil {
+		return err
+	}
+	if !r.Installed {
+		fmt.Printf("otmux %s is the latest version.\n", version.Version)
+		return nil
+	}
+	st := update.LoadState(filepath.Dir(platform.LogPath()))
+	st.LastCheck, st.Latest, st.Installed = time.Now(), r.Latest, r.Latest
+	_ = st.Save(filepath.Dir(platform.LogPath()))
+	fmt.Printf("Updated otmux %s -> %s.\n", version.Version, r.Latest)
+	fmt.Println("It starts next time you run otmux. To restart the background service too, run `otmux kill-server` (this closes running shells).")
 	return nil
 }
 

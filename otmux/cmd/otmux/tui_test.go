@@ -53,7 +53,7 @@ func TestTUI(t *testing.T) {
 	}
 	env := []string{
 		"OTMUX_SOCKET=" + filepath.Join(dir, "s.sock"), "OTMUX_SHELL=" + shell, "OTMUX_PANE=",
-		"OTMUX_CONFIG=" + cfgPath, "OTMUX_PREFIX=",
+		"OTMUX_CONFIG=" + cfgPath, "OTMUX_PREFIX=", "OTMUX_NO_UPDATE=1",
 	}
 	t.Cleanup(func() { runOtmux(t, env, bin, "kill-server") })
 
@@ -257,7 +257,12 @@ type term struct {
 
 func startTerm(t *testing.T, bin string, env []string, cols, rows int) *term {
 	t.Helper()
-	p, err := pty.Start(pty.Options{Argv: []string{bin, "new", "smoke"}, Env: env, Cols: cols, Rows: rows})
+	return startTermArgs(t, bin, []string{"new", "smoke"}, env, cols, rows)
+}
+
+func startTermArgs(t *testing.T, bin string, args, env []string, cols, rows int) *term {
+	t.Helper()
+	p, err := pty.Start(pty.Options{Argv: append([]string{bin}, args...), Env: env, Cols: cols, Rows: rows})
 	if err != nil {
 		t.Fatal(err)
 	}

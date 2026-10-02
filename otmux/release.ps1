@@ -54,6 +54,9 @@ foreach ($t in $targets) {
 }
 Remove-Item Env:GOOS, Env:GOARCH, Env:CGO_ENABLED
 
+# version.txt tells running copies of otmux which version is newest.
+Set-Content -Encoding ascii -NoNewline dist/version.txt $Version
+
 # Same format as sha256sum, so install.ps1 can check either.
 Get-ChildItem dist | Where-Object Name -ne "checksums.txt" | Sort-Object Name | ForEach-Object {
     "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLower(), $_.Name

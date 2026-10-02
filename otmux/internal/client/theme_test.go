@@ -126,3 +126,14 @@ func TestWorkingDotBlinks(t *testing.T) {
 		t.Fatal("waiting dot should stay steady")
 	}
 }
+
+func TestWrap(t *testing.T) {
+	got := wrap("otmux 9.9.9 is installed. It starts next time you run otmux.", 20)
+	want := []string{"otmux 9.9.9 is", "installed. It starts", "next time you run", "otmux."}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("wrap = %q", got)
+	}
+	if got := wrap("", 10); len(got) != 1 || got[0] != "" {
+		t.Fatalf("empty line: %q", got)
+	}
+}
