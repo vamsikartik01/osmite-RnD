@@ -7,6 +7,12 @@ All notable changes to otmux are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- `otmux restart` stops the background service and every shell, then opens
+  otmux again, e.g. to finish an update. It asks first (`-y` skips that) and
+  refuses to run from inside otmux, where it would close its own shell.
+
 ### Changed
 
 - **A cleaner window.** Tabs sit in a strip along the top. Every pane has a

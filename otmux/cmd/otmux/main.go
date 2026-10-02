@@ -4,6 +4,7 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -15,6 +16,8 @@ import (
 	"strings"
 	"text/tabwriter"
 	"time"
+
+	xterm "github.com/charmbracelet/x/term"
 
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/client"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/config"
@@ -35,6 +38,8 @@ Usage:
   otmux ls                  list workspaces                      (alias: list)
   otmux kill <name>         close a workspace and its shells
   otmux kill-server         stop the daemon and every shell
+  otmux restart [-y]        stop the daemon and every shell, then open otmux
+                            again (e.g. to start a new version); -y skips asking
   otmux keys                list key bindings
   otmux update              update otmux to the latest release
   otmux version
@@ -92,6 +97,8 @@ func run(args []string) error {
 		return oneShot(protocol.Command{Action: protocol.ActionKillWorkspace, Arg: arg()})
 	case "kill-server":
 		return oneShot(protocol.Command{Action: protocol.ActionKillServer})
+	case "restart":
+		return restart(arg() == "-y" || arg() == "--yes")
 	case "update":
 		return selfUpdate()
 	case "keys":
@@ -243,22 +250,74 @@ func runDaemon() error {
 	return err
 }
 
-func list() error {
+// restart stops the daemon, and with it every shell, then opens otmux
+// again with a fresh daemon from this program, e.g. one just updated. It
+// asks first when there are shells to lose, unless yes is set.
+func restart(yes bool) error {
+	if os.Getenv("OTMUX_PANE") != "" {
+		return errors.New("can't restart from inside otmux: it would close this shell too; run it from a plain terminal")
+	}
+	if reply, err := workspaces(); err == nil && len(reply.Workspaces) > 0 && !yes {
+		tabs := 0
+		for _, w := range reply.Workspaces {
+			tabs += w.Tabs
+		}
+		if !xterm.IsTerminal(os.Stdin.Fd()) {
+			return errors.New("restarting closes every shell in otmux; run otmux restart -y to confirm")
+		}
+		fmt.Printf("Restarting closes %s in %d workspace(s), and the programs running in them. Continue? [y/N] ",
+			tabsLabel(tabs), len(reply.Workspaces))
+		answer, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+		if a := strings.ToLower(strings.TrimSpace(answer)); a != "y" && a != "yes" {
+			fmt.Println("Not restarted.")
+			return nil
+		}
+	}
+	if err := oneShot(protocol.Command{Action: protocol.ActionKillServer}); err != nil {
+		return err
+	}
+	// Wait for the old daemon to let go of its socket before starting anew.
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		c, err := dial()
+		if err != nil {
+			break
+		}
+		c.Close()
+		if time.Now().After(deadline) {
+			return errors.New("the daemon didn't stop; try otmux kill-server")
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return attach("default", protocol.AttachOrCreate)
+}
+
+// workspaces asks the daemon for its workspaces.
+func workspaces() (protocol.ListReply, error) {
+	var reply protocol.ListReply
 	c, err := dial()
 	if err != nil {
-		fmt.Println("no daemon running")
-		return nil
+		return reply, err
 	}
 	defer c.Close()
 	if err := c.SendEmpty(protocol.TypeList); err != nil {
-		return err
+		return reply, err
 	}
 	f, err := c.Read()
 	if err != nil {
-		return err
+		return reply, err
 	}
-	var reply protocol.ListReply
-	if err := f.Decode(&reply); err != nil {
+	err = f.Decode(&reply)
+	return reply, err
+}
+
+func list() error {
+	if _, err := dial(); err != nil {
+		fmt.Println("no daemon running")
+		return nil
+	}
+	reply, err := workspaces()
+	if err != nil {
 		return err
 	}
 	if len(reply.Workspaces) == 0 {

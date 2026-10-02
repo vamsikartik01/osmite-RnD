@@ -76,6 +76,7 @@ otmux attach <name>     attach to an existing workspace           (alias: a)
 otmux ls                list workspaces                           (alias: list)
 otmux kill <name>       close a workspace and every shell in it
 otmux kill-server       stop the daemon and every shell
+otmux restart           stop the daemon and every shell, then open otmux again
 otmux keys              print all key bindings
 otmux update            update to the latest release
 otmux version
@@ -252,8 +253,8 @@ background, downloads the new version, verifies it against the release's
 SHA-256 checksums, and swaps it in for the program file. **Nothing is
 restarted**: your shells keep running, and the status bar shows
 `↑ 1.2.0 installed · restart to finish`. The new version starts the next time
-you run `otmux`; run `otmux kill-server` first if you also want the
-background service on the new version (that closes running shells).
+you run `otmux`; run `otmux restart` to put the background service on the
+new version too (that closes running shells, after asking).
 
 - Turn it off in **Settings › Updates**, or with `OTMUX_NO_UPDATE=1`.
 - Update straight away with **Settings › Updates › Update now** or

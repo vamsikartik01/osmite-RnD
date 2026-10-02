@@ -30,7 +30,7 @@ func (c *Client) startUpdates(daemonVersion string) {
 		// The program was updated but the running daemon is still the old one.
 		c.updateBadge = fmt.Sprintf("updated to %s · restart to finish", version.Version)
 		c.updateStatus = fmt.Sprintf("otmux %s is installed, but the background service is still %s. "+
-			"Run `otmux kill-server` to finish (this closes running shells).", version.Version, daemonVersion)
+			"Run `otmux restart` to finish (this closes running shells).", version.Version, daemonVersion)
 	case st.Installed != "" && update.Newer(st.Installed, version.Version):
 		c.updateBadge = fmt.Sprintf("%s installed · restart to finish", st.Installed)
 		c.updateStatus = fmt.Sprintf("otmux %s is installed and starts next time you run otmux.", st.Installed)
@@ -88,7 +88,7 @@ func (c *Client) checkUpdates(manual bool) {
 		st.Installed = r.Latest
 		c.updateBadge = fmt.Sprintf("%s installed · restart to finish", r.Latest)
 		c.updateStatus = fmt.Sprintf("otmux %s is installed. It starts next time you run otmux; "+
-			"run `otmux kill-server` first to restart the background service too (this closes running shells).", r.Latest)
+			"run `otmux restart` to restart the background service too (this closes running shells).", r.Latest)
 	default:
 		if manual {
 			c.updateStatus = fmt.Sprintf("otmux %s is the latest version.", version.Version)
