@@ -77,14 +77,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          set -euxo pipefail
+          trap 'echo "::error title=rolling release::updating otmux/latest failed at line $LINENO"' ERR
           version="${GITHUB_REF_NAME#otmux/v}"
           git tag -f otmux/latest "$GITHUB_SHA"
           git push -f origin otmux/latest
           notes="Always the newest otmux; currently **$version** ([release notes](https://github.com/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME)). The file names here never change, so links to them always download the latest version."
-          if gh release view otmux/latest >/dev/null 2>&1; then
-            gh release edit otmux/latest --title "otmux (latest: $version)" --notes "$notes" --latest=false
-            gh release upload otmux/latest dist/otmux-* dist/checksums.txt dist/version.txt --clobber
-          else
-            gh release create otmux/latest dist/otmux-* dist/checksums.txt dist/version.txt \
-              --title "otmux (latest: $version)" --notes "$notes" --latest=false
-          fi
+          # Recreate it rather than editing it in place: the release keeps its
+          # tag, and the download links work again as soon as it's created.
+          gh release delete otmux/latest --yes || true
+          gh release create otmux/latest dist/otmux-* dist/checksums.txt dist/version.txt \
+            --verify-tag --title "otmux (latest: $version)" --notes "$notes" --latest=false

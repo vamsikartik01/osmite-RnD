@@ -7,6 +7,13 @@ All notable changes to otmux are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-10-02
+
+### Fixed
+
+- The rolling "latest" release, which the download links, the installer and
+  automatic updates use, wasn't updated for 1.1.0. It now carries 1.1.1.
+
 ### Changed
 
 - Only official release builds update themselves; a copy built from source
@@ -63,6 +70,7 @@ published from the same code.
 - **Install**: a one-line PowerShell installer and fixed download links to
   the newest version.
 
-[Unreleased]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.0...HEAD
+[Unreleased]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.1...HEAD
+[1.1.1]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.0...otmux/v1.1.1
 [1.1.0]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.0.0...otmux/v1.1.0
 [1.0.0]: https://github.com/vamsikartik01/osmite-RnD/releases/tag/otmux/v1.0.0
