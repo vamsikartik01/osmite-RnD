@@ -9,6 +9,7 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/mattn/go-runewidth"
 
+	"github.com/vamsikartik01/osmite-RnD/otmux/internal/agents"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/config"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/keys"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/protocol"
@@ -223,9 +224,10 @@ func (c *Client) drawDividers(scr uv.Screen, st protocol.State) {
 // drawTitles gives every pane a title row just above it: the row below the
 // tab bar for the top panes, and the divider for panes below another.
 //
-//	⠹ claude  ~/src/otmux        │ pwsh  ~/notes
+//	Claude  ~/src/otmux          │ pwsh  ~/notes
 //
-// The focused pane's title is bright, the others dim.
+// The focused pane's title is bright, the others dim. An agent's status
+// shows in the sidebar and the tab bar, not here.
 func (c *Client) drawTitles(scr uv.Screen, st protocol.State) {
 	t := c.theme
 	strip := uv.Style{Bg: t.Bar}
@@ -243,10 +245,6 @@ func (c *Client) drawTitles(scr uv.Screen, st protocol.State) {
 		if d.Vertical && d.Y > 0 {
 			put(scr, d.X, d.Y-1, "│", uv.Style{Fg: t.Border, Bg: strip.Bg})
 		}
-	}
-	var tab protocol.TabInfo
-	if i := st.Active; i >= 0 && i < len(st.Tabs) {
-		tab = st.Tabs[i]
 	}
 	for _, p := range st.Panes {
 		y := p.Y - 1
@@ -268,11 +266,6 @@ func (c *Client) drawTitles(scr uv.Screen, st protocol.State) {
 			detailSt = uv.Style{Fg: t.Muted, Bg: bg}
 		}
 		x, end := p.X+1, p.X+p.W-1
-		if p.Agent != "" && tab.Pinned {
-			glyph, gst := statusGlyph(t, tab.Status)
-			gst.Bg = bg
-			x = put(scr, x, y, glyph, gst) + 1
-		}
 		x = put(scr, x, y, runewidth.Truncate(name, max(end-x, 0), "…"), nameSt)
 		if detail != "" && end-x > 4 {
 			put(scr, x+2, y, clipLeft(detail, end-x-2), detailSt)
@@ -285,7 +278,7 @@ func (c *Client) drawTitles(scr uv.Screen, st protocol.State) {
 func paneTitle(p protocol.PaneInfo) (name, detail string) {
 	name = p.Program
 	if p.Agent != "" {
-		name = p.Agent
+		name = agents.Name(p.Agent)
 	}
 	if name == "" {
 		name = "shell"

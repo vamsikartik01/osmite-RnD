@@ -8,6 +8,7 @@ import (
 	uv "github.com/charmbracelet/ultraviolet"
 	"github.com/mattn/go-runewidth"
 
+	"github.com/vamsikartik01/osmite-RnD/otmux/internal/agents"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/config"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/keys"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/protocol"
@@ -72,20 +73,30 @@ func (c *Client) paneCols() int { return max(c.cols-c.ox(), 1) }
 func (c *Client) daemonRows() int { return max(c.rows-c.oy(), 2) }
 
 // drawSidebar draws the sidebar on one alignment grid: the otmux mark on
-// the tab bar's row, section headings at column 1, rows straight below them
-// with notes right-aligned, and the current item in a highlighted box. A
-// line on its right edge separates it from the panes.
+// the tab bar's row, section headings at column 1, items straight below them
+// with a blank row between, notes right-aligned, and the current item in a
+// highlighted box. A watched tab takes two rows: its name, then the agent in
+// it and its workspace. A line on its right edge separates the sidebar from
+// the panes.
 //
 //	 otmux                    │
 //	                          │
 //	 WATCH                    │
 //	 ⠹ claude-refactor working│
+//	   Claude · api           │
+//	                          │
 //	 ● codex-tests    waiting │
+//	   Codex · web            │
 //	                          │
 //	 WORKSPACES             + │
 //	[  api                 3 ]│  current
+//	[  ~/src/api             ]│
+//	                          │
 //	   web                 1  │
+//	                          │  no saved folder
+//	                          │
 //	   lab                    │  saved, not open
+//	   ~/src/lab              │
 //	…                         │
 //	   Settings     Ctrl+B s  │
 func (c *Client) drawSidebar(s uv.Screen, h int) {
@@ -126,29 +137,39 @@ func (c *Client) drawSidebar(s uv.Screen, h int) {
 	}
 
 	// Watch list, capped at half the sidebar so workspaces stay visible.
+	// Each tab is two rows, with a blank row between tabs while they fit.
 	y := 2
 	heading(y, "WATCH")
 	y++
 	watchEnd := max(y+(bottom-y)/2, y+3)
+	pinned := c.state.Pinned
+	gap := 1
+	if len(pinned)*3-1 > watchEnd-y {
+		gap = 0
+	}
 	var current uint32
 	if i := c.state.Active; i >= 0 && i < len(c.state.Tabs) {
 		current = c.state.Tabs[i].ID
 	}
-	for i, p := range c.state.Pinned {
-		if y >= watchEnd-1 && i < len(c.state.Pinned)-1 {
-			row(y, 3, faint, fmt.Sprintf("%d more  %s Tab", len(c.state.Pinned)-i, prefix), "", nil)
-			y++
+	for i, p := range pinned {
+		if y+2 > watchEnd && i < len(pinned)-1 || y+2 > bottom-1 {
+			if y < bottom-1 {
+				row(y, 3, faint, fmt.Sprintf("%d more  %s Tab", len(pinned)-i, prefix), "", nil)
+				y++
+			}
+			gap = 0
 			break
 		}
 		st := plain
 		if p.TabID == current {
 			st = boxed
 		}
+		act := &keys.Action{Name: protocol.ActionGotoTab, Arg: fmt.Sprint(p.TabID)}
 		note := p.Status
 		if note == protocol.StatusIdle {
 			note = ""
 		}
-		row(y, 3, st, p.Name, note, &keys.Action{Name: protocol.ActionGotoTab, Arg: fmt.Sprint(p.TabID)})
+		row(y, 3, st, p.Name, note, act)
 		glyph, gst := statusGlyph(t, p.Status)
 		gst.Bg = st.Bg
 		put(s, 1, y, glyph, gst)
@@ -156,13 +177,29 @@ func (c *Client) drawSidebar(s uv.Screen, h int) {
 			put(s, w-1-len(note), y, note, uv.Style{Fg: t.Attn, Bg: st.Bg})
 		}
 		y++
+
+		// Second row: the agent, highlighted, then the workspace.
+		row(y, 3, uv.Style{Bg: st.Bg}, "", "", act)
+		x := 3
+		if p.Agent != "" {
+			x = put(s, x, y, agents.Name(p.Agent), uv.Style{Fg: t.Accent, Bg: st.Bg, Attrs: uv.AttrBold})
+			x = put(s, x, y, " · ", uv.Style{Fg: t.Faint, Bg: st.Bg})
+		}
+		if end := w - 1; end-x > 1 {
+			put(s, x, y, runewidth.Truncate(p.Workspace, end-x, "…"), uv.Style{Fg: t.Faint, Bg: st.Bg})
+		}
+		y += 1 + gap
 	}
-	if len(c.state.Pinned) == 0 {
+	if len(pinned) == 0 {
 		row(y, 1, faint, prefix+" m to watch a tab", "", nil)
 		y++
+	} else if gap == 1 {
+		y-- // the last tab's gap
 	}
 
-	// Workspaces, with + in the heading to add one.
+	// Workspaces, with + in the heading to add one: running ones, then saved
+	// ones that aren't open (dimmer, and no tab count). A blank row between
+	// them while they fit.
 	y++
 	if y >= bottom-1 {
 		return
@@ -171,26 +208,53 @@ func (c *Client) drawSidebar(s uv.Screen, h int) {
 	put(s, w-2, y, "+", uv.Style{Fg: t.Muted, Bg: t.Bar, Attrs: uv.AttrBold})
 	c.hits = append(c.hits, hit{x0: w - 4, x1: w, y: y, action: keys.Action{Name: keys.ActionPromptNewWorkspace}})
 	y++
+	type wsRow struct {
+		st               uv.Style
+		name, note, path string
+		act              keys.Action
+	}
+	paths := map[string]string{}
+	for _, p := range c.cfg.Workspaces {
+		paths[strings.ToLower(p.Name)] = p.Path
+	}
+	var rows []wsRow
 	running := map[string]bool{}
 	for _, ws := range c.state.Workspaces {
 		running[strings.ToLower(ws.Name)] = true
-		if y >= bottom-1 {
+		path := paths[strings.ToLower(ws.Name)]
+		if ws.Name == c.state.Workspace {
+			rows = append(rows, wsRow{boxed, ws.Name, fmt.Sprint(ws.Tabs), path, keys.Action{Name: keys.ActionChooseWorkspace}})
+		} else {
+			rows = append(rows, wsRow{plain, ws.Name, fmt.Sprint(ws.Tabs), path, keys.Action{Name: protocol.ActionSwitchWorkspace, Arg: ws.Name}})
+		}
+	}
+	for _, p := range c.cfg.Workspaces {
+		if !running[strings.ToLower(p.Name)] {
+			rows = append(rows, wsRow{faint, p.Name, "", p.Path, keys.Action{Name: protocol.ActionNewWorkspace, Arg: p.Name, Dir: p.Path}})
+		}
+	}
+	// Two rows each (name, then folder) and a blank row between while they
+	// fit; then without the blank rows; then one row each.
+	lines, gap := 2, 1
+	switch room := bottom - 1 - y; {
+	case len(rows)*3-1 <= room:
+	case len(rows)*2 <= room:
+		gap = 0
+	default:
+		lines, gap = 1, 0
+	}
+	for _, r := range rows {
+		if y+lines > bottom-1 {
 			break
 		}
-		if ws.Name == c.state.Workspace {
-			row(y, 3, boxed, ws.Name, fmt.Sprint(ws.Tabs), &keys.Action{Name: keys.ActionChooseWorkspace})
-		} else {
-			row(y, 3, plain, ws.Name, fmt.Sprint(ws.Tabs), &keys.Action{Name: protocol.ActionSwitchWorkspace, Arg: ws.Name})
+		row(y, 3, r.st, r.name, r.note, &r.act)
+		if lines == 2 {
+			row(y+1, 3, uv.Style{Bg: r.st.Bg}, "", "", &r.act)
+			if r.path != "" {
+				put(s, 3, y+1, clipLeft(shortPath(r.path), w-4), uv.Style{Fg: t.Faint, Bg: r.st.Bg})
+			}
 		}
-		y++
-	}
-	// Saved workspaces that aren't open: dimmer, and no tab count.
-	for _, p := range c.cfg.Workspaces {
-		if running[strings.ToLower(p.Name)] || y >= bottom-1 {
-			continue
-		}
-		row(y, 3, faint, p.Name, "", &keys.Action{Name: protocol.ActionNewWorkspace, Arg: p.Name, Dir: p.Path})
-		y++
+		y += lines + gap
 	}
 
 	if bottom > y {

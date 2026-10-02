@@ -13,8 +13,8 @@ import (
 const (
 	// agentScanInterval is how often the daemon looks for coding agents.
 	agentScanInterval = time.Second
-	// workingWindow: an agent counts as working while it produced output by
-	// itself this recently (agents redraw a spinner while they think).
+	// workingWindow: an agent counts as working while it keeps producing
+	// output by itself, each burst this soon after the last (see workBursts).
 	workingWindow = 1500 * time.Millisecond
 )
 
@@ -77,7 +77,7 @@ func (s *Server) scanAgents() {
 					p.agent = a
 					changed = true // pane titles show it
 				}
-				if p.agent != "" && now.Sub(p.lastOutput) < workingWindow {
+				if p.agent != "" && p.working(now) {
 					recent = true
 				}
 			}

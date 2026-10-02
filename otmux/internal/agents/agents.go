@@ -21,6 +21,21 @@ var known = map[string]string{
 	"crush": "crush",
 }
 
+// names are how agents are shown to people.
+var names = map[string]string{
+	"claude": "Claude", "codex": "Codex", "gemini": "Gemini", "aider": "Aider",
+	"opencode": "opencode", "cursor": "Cursor", "goose": "Goose", "amp": "Amp",
+	"qwen": "Qwen", "crush": "Crush",
+}
+
+// Name is agent's display name, e.g. "Claude" for "claude".
+func Name(agent string) string {
+	if n := names[agent]; n != "" {
+		return n
+	}
+	return agent
+}
+
 // interpreters run agents distributed as scripts (npm, pip).
 var interpreters = map[string]bool{
 	"node": true, "bun": true, "deno": true, "npx": true,

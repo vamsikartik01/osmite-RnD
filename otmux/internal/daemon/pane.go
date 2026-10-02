@@ -42,6 +42,7 @@ type Pane struct {
 	agent        string    // coding agent running in the pane, if any
 	notified     bool      // rang the bell or sent a desktop notification
 	lastOutput   time.Time // when the program last produced output by itself
+	bursts       int       // separate bursts of that output, each soon after the last
 	lastPoke     time.Time // when the user last typed into or resized the pane
 	typed        bool      // the user has typed or pasted into the pane
 	exited       bool
@@ -158,11 +159,33 @@ func (p *Pane) drainInput() {
 // program reacting (echo, redraw), not working on its own.
 const echoWindow = 400 * time.Millisecond
 
+// burstGap: output this soon after the last is the same write, split up.
+const burstGap = 50 * time.Millisecond
+
+// workBursts: a program is working once it has produced this many bursts of
+// output by itself, each within workingWindow of the last. Agents redraw a
+// spinner many times a second while they think; one late redraw (a hint
+// fading out after a click, a resize settling) is a single burst.
+const workBursts = 3
+
 // noteOutput records output, unless it's an echo of the user's own input.
 func (p *Pane) noteOutput(now time.Time) {
-	if now.Sub(p.lastPoke) > echoWindow {
-		p.lastOutput = now
+	if now.Sub(p.lastPoke) <= echoWindow {
+		return
 	}
+	since := now.Sub(p.lastOutput)
+	if since >= workingWindow {
+		p.bursts = 0
+	}
+	if p.bursts == 0 || since >= burstGap {
+		p.bursts++
+	}
+	p.lastOutput = now
+}
+
+// working reports whether the program is producing output by itself.
+func (p *Pane) working(now time.Time) bool {
+	return p.bursts >= workBursts && now.Sub(p.lastOutput) < workingWindow
 }
 
 func (p *Pane) resize(cols, rows int) {

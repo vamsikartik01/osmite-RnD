@@ -165,7 +165,9 @@ The classic tmux keys still work as aliases: `%` `"` `,` `&` `$` `(` `)` `:`
 
 The **WATCH** list at the top of the sidebar (or after the workspaces in the
 two-bars layout) holds tabs from every workspace that you want to keep an eye
-on. It shows tab names only; click one to jump to it.
+on. Each tab shows its name, and below it the agent running there (Claude,
+Codex, ...) and its workspace; click one to jump to it. A tab's status shows
+here and in the tab bar.
 
 - Tabs running an AI coding agent (Claude Code, Codex, Gemini CLI, Aider,
   opencode, Cursor Agent, Goose, Amp, Qwen Code, Crush) **join it by
