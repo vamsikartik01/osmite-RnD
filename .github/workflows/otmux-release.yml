@@ -80,6 +80,13 @@ jobs:
           set -euxo pipefail
           trap 'echo "::error title=rolling release::updating otmux/latest failed at line $LINENO"' ERR
           version="${GITHUB_REF_NAME#otmux/v}"
+          # Every file the rolling release serves must exist before anything
+          # is changed, so a broken build can't leave the links dead.
+          for f in version.txt checksums.txt otmux-windows-amd64.exe otmux-windows-arm64.exe \
+                   otmux-linux-amd64 otmux-linux-arm64 otmux-darwin-amd64 otmux-darwin-arm64; do
+            test -s "dist/$f" || { echo "::error title=rolling release::dist/$f is missing"; exit 1; }
+          done
+          test "$(cat dist/version.txt)" = "$version"
           git tag -f otmux/latest "$GITHUB_SHA"
           git push -f origin otmux/latest
           notes="Always the newest otmux; currently **$version** ([release notes](https://github.com/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME)). The file names here never change, so links to them always download the latest version."
