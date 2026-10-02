@@ -13,8 +13,8 @@ import (
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/protocol"
 )
 
-// sidebarWidth is the sidebar's width in cells; one more blank column
-// separates it from the panes.
+// sidebarWidth is the sidebar's width in cells; one more column holds the
+// line that separates it from the panes.
 const sidebarWidth = 26
 
 // sidebarMinCols is the narrowest terminal that still shows the sidebar.
@@ -37,22 +37,31 @@ func (c *Client) layout() string {
 	return l
 }
 
-// ox is how far right the panes start: past the sidebar if it's shown.
-// Called with c.mu held.
+// ox is how far right the panes start: past the sidebar, its edge and a
+// column of space, if it's shown. Called with c.mu held.
 func (c *Client) ox() int {
+	if c.layout() == config.LayoutSidebar {
+		return sidebarWidth + 2
+	}
+	return 0
+}
+
+// barX is where the tab bar and the top title row start: right after the
+// sidebar's edge. Called with c.mu held.
+func (c *Client) barX() int {
 	if c.layout() == config.LayoutSidebar {
 		return sidebarWidth + 1
 	}
 	return 0
 }
 
-// oy is how far down the panes start: below the top tab bar if it's shown.
-// Called with c.mu held.
+// oy is how far down the panes start: below the tab bar and the title row
+// of the top panes, if they're shown. Called with c.mu held.
 func (c *Client) oy() int {
-	if c.layout() == config.LayoutTwoBars {
-		return 1
+	if c.layout() == config.LayoutCompact {
+		return 0
 	}
-	return 0
+	return 2
 }
 
 // paneCols is the width the daemon lays panes out in. Called with c.mu held.
@@ -62,29 +71,33 @@ func (c *Client) paneCols() int { return max(c.cols-c.ox(), 1) }
 // the bottom bar itself. Called with c.mu held.
 func (c *Client) daemonRows() int { return max(c.rows-c.oy(), 2) }
 
-// drawSidebar draws the sidebar on one alignment grid: section headings at
-// column 1, rows straight below them, counts right-aligned, and the current
-// item in a full-width highlighted box.
+// drawSidebar draws the sidebar on one alignment grid: the otmux mark on
+// the tab bar's row, section headings at column 1, rows straight below them
+// with notes right-aligned, and the current item in a highlighted box. A
+// line on its right edge separates it from the panes.
 //
-//	 WATCH
-//	 ● claude-refactor
-//	 ◉ codex-tests
-//	 ○ notes
-//
-//	 WORKSPACES            +
-//	[  api                 3 ]   current
-//	   web                 1
-//	   lab             saved
-//	…
-//	   Settings     Ctrl+B s
+//	 otmux                    │
+//	                          │
+//	 WATCH                    │
+//	 ⠹ claude-refactor working│
+//	 ● codex-tests    waiting │
+//	                          │
+//	 WORKSPACES             + │
+//	[  api                 3 ]│  current
+//	   web                 1  │
+//	   lab                    │  saved, not open
+//	…                         │
+//	   Settings     Ctrl+B s  │
 func (c *Client) drawSidebar(s uv.Screen, h int) {
 	t := c.theme
 	w := sidebarWidth
 	plain := uv.Style{Fg: t.Muted, Bg: t.Bar}
 	faint := uv.Style{Fg: t.Faint, Bg: t.Bar}
 	boxed := uv.Style{Fg: t.Text, Bg: t.Raised, Attrs: uv.AttrBold}
+	edge := uv.Style{Fg: t.Border, Bg: t.Bar}
 	for y := 0; y < h; y++ {
 		fill(s, 0, y, w, uv.Style{Bg: t.Bar})
+		put(s, w, y, "│", edge)
 	}
 
 	// row draws one line: text from column x, an optional right-aligned
@@ -106,8 +119,14 @@ func (c *Client) drawSidebar(s uv.Screen, h int) {
 	bottom := h - 1 // settings sits on the last row
 	prefix := keys.Label(c.keys.Keymap().Prefix)
 
+	// The mark, in the logo's gradient, level with the tab bar.
+	x := 1
+	for i, r := range "otmux" {
+		x = put(s, x, 0, string(r), uv.Style{Fg: gradient(t, float64(i)/4), Bg: t.Bar, Attrs: uv.AttrBold})
+	}
+
 	// Watch list, capped at half the sidebar so workspaces stay visible.
-	y := 1
+	y := 2
 	heading(y, "WATCH")
 	y++
 	watchEnd := max(y+(bottom-y)/2, y+3)
@@ -117,7 +136,7 @@ func (c *Client) drawSidebar(s uv.Screen, h int) {
 	}
 	for i, p := range c.state.Pinned {
 		if y >= watchEnd-1 && i < len(c.state.Pinned)-1 {
-			row(y, 3, faint, fmt.Sprintf("+%d more · %s Tab", len(c.state.Pinned)-i, prefix), "", nil)
+			row(y, 3, faint, fmt.Sprintf("%d more  %s Tab", len(c.state.Pinned)-i, prefix), "", nil)
 			y++
 			break
 		}
@@ -125,14 +144,21 @@ func (c *Client) drawSidebar(s uv.Screen, h int) {
 		if p.TabID == current {
 			st = boxed
 		}
-		row(y, 3, st, p.Name, "", &keys.Action{Name: protocol.ActionGotoTab, Arg: fmt.Sprint(p.TabID)})
+		note := p.Status
+		if note == protocol.StatusIdle {
+			note = ""
+		}
+		row(y, 3, st, p.Name, note, &keys.Action{Name: protocol.ActionGotoTab, Arg: fmt.Sprint(p.TabID)})
 		glyph, gst := statusGlyph(t, p.Status)
 		gst.Bg = st.Bg
 		put(s, 1, y, glyph, gst)
+		if p.Status == protocol.StatusWaiting {
+			put(s, w-1-len(note), y, note, uv.Style{Fg: t.Attn, Bg: st.Bg})
+		}
 		y++
 	}
 	if len(c.state.Pinned) == 0 {
-		row(y, 1, faint, "Agents show up here", "", nil)
+		row(y, 1, faint, prefix+" m to watch a tab", "", nil)
 		y++
 	}
 
@@ -158,29 +184,31 @@ func (c *Client) drawSidebar(s uv.Screen, h int) {
 		}
 		y++
 	}
+	// Saved workspaces that aren't open: dimmer, and no tab count.
 	for _, p := range c.cfg.Workspaces {
 		if running[strings.ToLower(p.Name)] || y >= bottom-1 {
 			continue
 		}
-		row(y, 3, faint, p.Name, "saved", &keys.Action{Name: protocol.ActionNewWorkspace, Arg: p.Name, Dir: p.Path})
+		row(y, 3, faint, p.Name, "", &keys.Action{Name: protocol.ActionNewWorkspace, Arg: p.Name, Dir: p.Path})
 		y++
 	}
 
 	if bottom > y {
-		row(bottom, 3, plain, "Settings", prefix+" s", &keys.Action{Name: keys.ActionSettings})
+		row(bottom, 3, faint, "Settings", prefix+" s", &keys.Action{Name: keys.ActionSettings})
 	}
 }
 
-// blinkInterval is how long a working dot stays in each phase.
-const blinkInterval = 500 * time.Millisecond
+// spinInterval is how long each frame of a working agent's spinner shows.
+const spinInterval = 100 * time.Millisecond
 
-// now is the clock used for blinking; tests replace it.
+// spinner is the animation shown while an agent works.
+var spinner = []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
+
+// now is the clock used for animation; tests replace it.
 var now = time.Now
 
-func blinkOn() bool { return now().UnixMilli()/blinkInterval.Milliseconds()%2 == 0 }
-
-// anyWorking reports whether a watched tab's dot is pulsing, so the screen
-// needs redrawing to animate it. Called with c.mu held.
+// anyWorking reports whether a watched tab's spinner is turning, so the
+// screen needs redrawing to animate it. Called with c.mu held.
 func (c *Client) anyWorking() bool {
 	for _, p := range c.state.Pinned {
 		if p.Status == protocol.StatusWorking {
@@ -190,18 +218,15 @@ func (c *Client) anyWorking() bool {
 	return false
 }
 
-// statusGlyph is the dot shown for a watched tab: ● working (accent),
-// ◉ waiting for you (attention), ○ idle.
+// statusGlyph is the mark shown for a watched tab: a spinner while the
+// agent works (accent), ● when it waits for you (attention), ○ idle.
 func statusGlyph(t Theme, status string) (string, uv.Style) {
 	switch status {
 	case protocol.StatusWorking:
-		// Pulse while the agent works: accent, then dim, twice a second.
-		if blinkOn() {
-			return "●", uv.Style{Fg: t.Accent, Attrs: uv.AttrBold}
-		}
-		return "●", uv.Style{Fg: t.Faint}
+		frame := now().UnixMilli() / spinInterval.Milliseconds() % int64(len(spinner))
+		return spinner[frame], uv.Style{Fg: t.Accent, Attrs: uv.AttrBold}
 	case protocol.StatusWaiting:
-		return "◉", uv.Style{Fg: t.Attn, Attrs: uv.AttrBold}
+		return "●", uv.Style{Fg: t.Attn, Attrs: uv.AttrBold}
 	}
 	return "○", uv.Style{Fg: t.Faint}
 }

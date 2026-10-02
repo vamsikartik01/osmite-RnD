@@ -872,7 +872,8 @@ func (s *Server) state(ws *Workspace) protocol.State {
 	for _, id := range t.tree.Panes() {
 		if r, ok := rects[id]; ok {
 			p := t.panes[id]
-			st.Panes = append(st.Panes, protocol.PaneInfo{ID: id, X: r.X, Y: r.Y, W: r.W, H: r.H, Title: p.title, Mouse: p.wantsMouse(), Fresh: !p.typed})
+			st.Panes = append(st.Panes, protocol.PaneInfo{ID: id, X: r.X, Y: r.Y, W: r.W, H: r.H, Title: p.title,
+				Program: p.program, Agent: p.agent, Cwd: p.cwd, Mouse: p.wantsMouse(), Fresh: !p.typed})
 		}
 	}
 	for _, d := range divs {

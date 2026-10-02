@@ -213,6 +213,11 @@ type PaneInfo struct {
 	W     int    `json:"w"`
 	H     int    `json:"h"`
 	Title string `json:"title,omitempty"`
+	// Program is the pane's shell, e.g. "pwsh"; Agent the coding agent
+	// running in it, if any; Cwd its folder, if the shell reports it.
+	Program string `json:"program,omitempty"`
+	Agent   string `json:"agent,omitempty"`
+	Cwd     string `json:"cwd,omitempty"`
 	// Mouse is set when the program in the pane asked for mouse events
 	// (vim, htop, ...). Clients then forward clicks instead of selecting text.
 	Mouse bool `json:"mouse,omitempty"`

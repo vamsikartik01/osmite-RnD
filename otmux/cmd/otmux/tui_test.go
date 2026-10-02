@@ -59,7 +59,7 @@ func TestTUI(t *testing.T) {
 
 	term := startTerm(t, bin, env, 100, 30)
 
-	term.waitFor(t, "status bar", func(s string) bool { return currentWS(s, "smoke") && strings.Contains(s, "for shortcuts") })
+	term.waitFor(t, "status bar", func(s string) bool { return currentWS(s, "smoke") && strings.Contains(s, "commands") })
 	if !term.modeEnabled(ansi.ModeMouseExtSgr) {
 		t.Fatal("client must request SGR mouse encoding; legacy encoding prints junk in Windows Terminal")
 	}
@@ -118,16 +118,16 @@ func TestTUI(t *testing.T) {
 	term.typ("\x1b")
 	term.waitFor(t, "palette closed", func(s string) bool { return !strings.Contains(s, "Split side by side") })
 
-	// Mouse: clicking tab 0 in the status bar switches back to it.
-	term.clickStatus(t, " 0 ")
+	// Mouse: clicking tab 0 in the tab bar switches back to it.
+	term.click(t, " 0 ")
 	term.waitFor(t, "click switches tab", func(s string) bool { return strings.Contains(s, "tui-check-7") })
-	term.clickStatus(t, "1 api")
+	term.click(t, "1 api")
 	term.waitFor(t, "click back to api", func(s string) bool { return !strings.Contains(s, "tui-check-7") })
 
 	// The sidebar lists workspaces (running and saved) and pinned tabs.
 	term.waitFor(t, "sidebar", func(s string) bool {
 		w, ws := strings.Index(s, "WATCH"), strings.Index(s, "WORKSPACES")
-		return w >= 0 && ws > w && strings.Contains(s, "saved") // watch list on top
+		return w >= 0 && ws > w && strings.Contains(s, "   lab ") // watch list on top
 	})
 
 	// Pin the api tab by hand: it shows in the pinned list.
@@ -179,7 +179,7 @@ func TestTUI(t *testing.T) {
 	term.waitFor(t, "settings closed", func(s string) bool { return !strings.Contains(s, "Appearance") })
 
 	// A saved workspace opens from the sidebar, in its folder.
-	term.click(t, "saved")
+	term.click(t, "   lab ")
 	term.waitFor(t, "saved workspace", func(s string) bool { return currentWS(s, "lab") })
 
 	// Remove it from the saved list in settings: it's forgotten, but the

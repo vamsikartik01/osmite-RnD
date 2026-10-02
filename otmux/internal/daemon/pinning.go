@@ -73,8 +73,9 @@ func (s *Server) scanAgents() {
 				if p.exited {
 					continue
 				}
-				if err == nil {
-					p.agent = agentOf[p.pty.Pid()]
+				if a := agentOf[p.pty.Pid()]; err == nil && a != p.agent {
+					p.agent = a
+					changed = true // pane titles show it
 				}
 				if p.agent != "" && now.Sub(p.lastOutput) < workingWindow {
 					recent = true

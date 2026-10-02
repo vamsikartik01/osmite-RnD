@@ -300,14 +300,14 @@ func (c *Client) applySnapshot(s protocol.Snapshot) {
 func (c *Client) renderLoop() {
 	clock := time.NewTicker(15 * time.Second) // keeps the status bar clock current
 	defer clock.Stop()
-	blink := time.NewTicker(blinkInterval) // animates working agents' dots
-	defer blink.Stop()
+	spin := time.NewTicker(spinInterval) // animates working agents' spinners
+	defer spin.Stop()
 	for {
 		select {
 		case <-c.done:
 			return
 		case <-clock.C:
-		case <-blink.C:
+		case <-spin.C:
 			c.mu.Lock()
 			working := c.anyWorking()
 			c.mu.Unlock()

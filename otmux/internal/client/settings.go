@@ -35,7 +35,7 @@ var layoutLabels = map[string]string{
 }
 
 var layoutHints = map[string]string{
-	config.LayoutSidebar: "workspaces left, tabs below",
+	config.LayoutSidebar: "workspaces left, tabs on top",
 	config.LayoutTwoBars: "tabs on top, workspaces below",
 	config.LayoutCompact: "one bar",
 }
@@ -398,14 +398,13 @@ func (c *Client) drawSettings(s uv.Screen, st *settings) (int, int) {
 		y := st.menuY + i
 		style := uv.Style{Fg: t.Muted, Bg: t.Surface}
 		if i == st.section {
-			if st.inMenu {
-				style = uv.Style{Fg: t.OnAccent, Bg: t.Accent, Attrs: uv.AttrBold}
-			} else {
-				style = uv.Style{Fg: t.Text, Bg: t.Raised, Attrs: uv.AttrBold}
-			}
+			style = uv.Style{Fg: t.Text, Bg: t.Raised, Attrs: uv.AttrBold}
 		}
 		fill(s, st.menuX, y, menuW-2, uv.Style{Bg: style.Bg})
-		put(s, st.menuX+1, y, name, style)
+		if i == st.section && st.inMenu {
+			put(s, st.menuX, y, "›", uv.Style{Fg: t.Accent, Bg: style.Bg, Attrs: uv.AttrBold})
+		}
+		put(s, st.menuX+2, y, name, style)
 	}
 	for yy := by + 1; yy < by+h-2; yy++ {
 		put(s, bx+menuW+1, yy, "│", frame)
@@ -454,16 +453,19 @@ func (c *Client) drawSettings(s uv.Screen, st *settings) (int, int) {
 			selected := !st.inMenu && i == st.sel[st.section]
 			bg, fg, dim := t.Surface, t.Text, t.Faint
 			if selected {
-				bg, fg, dim = t.Accent, t.OnAccent, t.OnAccent
+				bg, dim = t.Raised, t.Muted
 			}
 			fill(s, st.rowsX, y+i, st.rowsW, uv.Style{Bg: bg})
+			if selected {
+				put(s, st.rowsX, y+i, "›", uv.Style{Fg: t.Accent, Bg: bg, Attrs: uv.AttrBold})
+			}
 			left := r.left
 			swatch := st.section == secAppearance && i < len(Themes)
 			if swatch {
 				left = "      " + left
 			}
 			if r.current {
-				left += "  ●"
+				left += "  ✓"
 			}
 			end := cx + cw // right edge for the right-hand text
 			if r.remove != nil {
@@ -491,7 +493,11 @@ func (c *Client) drawSettings(s uv.Screen, st *settings) (int, int) {
 	if st.note != "" {
 		footer = st.note
 	}
-	put(s, bx+3, by+h-2, runewidth.Truncate(footer, w-6, "…"), uv.Style{Fg: t.Faint, Bg: t.Surface})
+	if st.note != "" {
+		put(s, bx+3, by+h-2, runewidth.Truncate(footer, w-6, "…"), uv.Style{Fg: t.Accent, Bg: t.Surface})
+	} else {
+		drawKeyHints(s, bx+3, by+h-2, footer, t, t.Surface)
+	}
 	return cursorX, cursorY
 }
 

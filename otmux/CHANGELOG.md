@@ -7,6 +7,19 @@ All notable changes to otmux are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **A cleaner window.** Tabs sit in a strip along the top. Every pane has a
+  title row showing what runs in it (the shell or coding agent) and its
+  folder, with the focused pane's title lifted. The sidebar has an edge,
+  the otmux mark and each watched agent's status ("working", "waiting").
+  The bottom bar shows where you are and the main keys.
+- The command palette and Settings use a quieter selection, show each
+  group name once, and draw keys bright with the prefix dim.
+- A working agent shows a spinner instead of a blinking dot; the logo and
+  mark use a gradient drawn from the theme's accent; the welcome screen's
+  keys look like keycaps.
+
 ## [1.1.4] - 2026-10-02
 
 ### Fixed

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -34,6 +35,7 @@ type Pane struct {
 	cols, rows   int
 	cursorHidden bool
 	title        string
+	program      string // the shell's name, e.g. "pwsh"
 	cwd          string // reported by the shell via OSC 7, if it does
 	mouseModes   map[ansi.Mode]bool
 	stateChanged bool      // title or mouse mode changed; clients need a new State
@@ -62,6 +64,9 @@ func newPane(id uint32, argv []string, dir string, cols, rows int) (*Pane, error
 		return nil, err
 	}
 	pane := &Pane{id: id, pty: p, emu: vt.NewEmulator(cols, rows), cols: cols, rows: rows, mouseModes: map[ansi.Mode]bool{}}
+	if len(argv) > 0 {
+		pane.program = strings.TrimSuffix(filepath.Base(argv[0]), filepath.Ext(argv[0]))
+	}
 	pane.emu.SetScrollbackSize(scrollbackLines)
 	pane.emu.SetCallbacks(vt.Callbacks{
 		Title: func(t string) {
@@ -72,7 +77,10 @@ func newPane(id uint32, argv []string, dir string, cols, rows int) (*Pane, error
 		DisableMode:      func(m ansi.Mode) { pane.setMouseMode(m, false) },
 		CursorVisibility: func(visible bool) { pane.cursorHidden = !visible },
 		Bell:             func() { pane.notified = true },
-		WorkingDirectory: func(u string) { pane.cwd = parseFileURL(u) },
+		WorkingDirectory: func(u string) {
+			pane.cwd = parseFileURL(u)
+			pane.stateChanged = true
+		},
 	})
 	// Desktop notifications: OSC 9 (iTerm2, Windows Terminal) and OSC 777
 	// (urxvt, VTE). Agents send these when they finish or need permission.

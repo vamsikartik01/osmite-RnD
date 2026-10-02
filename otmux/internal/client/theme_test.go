@@ -107,23 +107,19 @@ func TestPaneCellRecolours(t *testing.T) {
 	}
 }
 
-func TestWorkingDotBlinks(t *testing.T) {
+func TestWorkingSpinnerTurns(t *testing.T) {
 	defer func() { now = time.Now }()
 	th := ThemeByName("graphite")
-	at := func(ms int64) uv.Style {
+	at := func(status string, ms int64) string {
 		now = func() time.Time { return time.UnixMilli(ms) }
-		_, st := statusGlyph(th, protocol.StatusWorking)
-		return st
+		g, _ := statusGlyph(th, status)
+		return g
 	}
-	if a, b := at(0), at(blinkInterval.Milliseconds()); a.Fg == b.Fg {
-		t.Fatal("working dot should alternate colours")
+	if a, b := at(protocol.StatusWorking, 0), at(protocol.StatusWorking, spinInterval.Milliseconds()); a == b {
+		t.Fatal("working spinner should move")
 	}
-	now = func() time.Time { return time.UnixMilli(0) }
-	_, w0 := statusGlyph(th, protocol.StatusWaiting)
-	now = func() time.Time { return time.UnixMilli(blinkInterval.Milliseconds()) }
-	_, w1 := statusGlyph(th, protocol.StatusWaiting)
-	if w0.Fg != w1.Fg {
-		t.Fatal("waiting dot should stay steady")
+	if a, b := at(protocol.StatusWaiting, 0), at(protocol.StatusWaiting, spinInterval.Milliseconds()); a != b {
+		t.Fatal("waiting mark should stay steady")
 	}
 }
 

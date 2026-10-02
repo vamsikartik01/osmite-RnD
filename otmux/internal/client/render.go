@@ -42,6 +42,7 @@ func (c *Client) render() {
 	switch layout {
 	case config.LayoutSidebar:
 		c.drawSidebar(scr, paneRows)
+		c.drawTopBar(scr)
 	case config.LayoutTwoBars:
 		c.drawTopBar(scr)
 	}
@@ -52,7 +53,6 @@ func (c *Client) render() {
 	for _, p := range view.Panes {
 		if h := c.history[p.ID]; h != nil {
 			drawMirror(scr, h.mirror, p, pt)
-			c.drawHistoryBadge(scr, p, h)
 		} else {
 			m := c.mirrors[p.ID]
 			drawMirror(scr, m, p, pt)
@@ -75,6 +75,12 @@ func (c *Client) render() {
 		}
 	}
 	c.drawDividers(scr, view)
+	c.drawTitles(scr, view)
+	for _, p := range view.Panes {
+		if h := c.history[p.ID]; h != nil {
+			c.drawHistoryBadge(scr, p, h)
+		}
+	}
 	c.drawStatus(scr, c.rows-1)
 	if c.overlay != nil {
 		cursorX, cursorY = c.drawOverlay(scr, c.overlay)
@@ -131,11 +137,16 @@ func (c *Client) shifted() protocol.State {
 }
 
 // drawHistoryBadge marks a pane that shows scrollback rather than the live
-// screen, in its top-right corner.
+// screen, at the right end of its title row (or its top row, if it has no
+// title row).
 func (c *Client) drawHistoryBadge(scr uv.Screen, p protocol.PaneInfo, h *histView) {
-	label := fmt.Sprintf(" ↑ %d of %d lines · type to return ", h.offset, h.total)
+	label := fmt.Sprintf(" SCROLL  %d / %d  type to return ", h.offset, h.total)
+	y := p.Y
+	if p.Y > 0 {
+		y = p.Y - 1
+	}
 	if w := runewidth.StringWidth(label); w < p.W {
-		put(scr, p.X+p.W-w, p.Y, label, uv.Style{Fg: c.theme.OnAccent, Bg: c.theme.Accent, Attrs: uv.AttrBold})
+		put(scr, p.X+p.W-w, y, label, uv.Style{Fg: c.theme.OnAccent, Bg: c.theme.Accent, Attrs: uv.AttrBold})
 	}
 }
 
@@ -173,27 +184,22 @@ func drawMirror(scr uv.Screen, m *mirror, p protocol.PaneInfo, th *Theme) {
 }
 
 // drawDividers draws the lines between panes, choosing box-drawing glyphs
-// from each cell's neighbours so junctions come out as ├ ┤ ┬ ┴ ┼. Segments
-// around the focused pane are drawn in the accent colour.
+// from each cell's neighbours so junctions come out as ├ ┤ ┬ ┴ ┼. Most are
+// covered by title rows afterwards; what's left are the vertical lines.
 func (c *Client) drawDividers(scr uv.Screen, st protocol.State) {
 	if len(st.Dividers) == 0 {
 		return
 	}
 	type pt struct{ x, y int }
-	mask := map[pt]bool{}
+	mask, vert := map[pt]bool{}, map[pt]bool{}
 	for _, d := range st.Dividers {
 		for i := 0; i < d.Len; i++ {
 			if d.Vertical {
 				mask[pt{d.X, d.Y + i}] = true
+				vert[pt{d.X, d.Y + i}] = true
 			} else {
 				mask[pt{d.X + i, d.Y}] = true
 			}
-		}
-	}
-	var active protocol.PaneInfo
-	for _, p := range st.Panes {
-		if p.ID == st.ActivePane {
-			active = p
 		}
 	}
 	t := c.theme
@@ -201,16 +207,100 @@ func (c *Client) drawDividers(scr uv.Screen, st protocol.State) {
 		up, down := mask[pt{p.x, p.y - 1}], mask[pt{p.x, p.y + 1}]
 		left, right := mask[pt{p.x - 1, p.y}], mask[pt{p.x + 1, p.y}]
 		glyph := boxGlyph(up, down, left, right)
-		fg := t.Border
-		if p.x >= active.X-1 && p.x <= active.X+active.W && p.y >= active.Y-1 && p.y <= active.Y+active.H {
-			fg = t.Accent
+		if vert[p] {
+			// Horizontal dividers become title rows, so vertical lines run
+			// straight past them instead of joining.
+			glyph = "│"
 		}
-		st := uv.Style{Fg: fg}
+		st := uv.Style{Fg: t.Border}
 		if pt := c.paneTheme(); pt != nil {
 			st.Bg = pt.Bg
 		}
 		scr.SetCell(p.x, p.y, &uv.Cell{Content: glyph, Width: 1, Style: st})
 	}
+}
+
+// drawTitles gives every pane a title row just above it: the row below the
+// tab bar for the top panes, and the divider for panes below another.
+//
+//	⠹ claude  ~/src/otmux        │ pwsh  ~/notes
+//
+// The focused pane's title is bright, the others dim.
+func (c *Client) drawTitles(scr uv.Screen, st protocol.State) {
+	t := c.theme
+	strip := uv.Style{Bg: t.Bar}
+	if oy := c.oy(); oy > 0 {
+		fill(scr, c.barX(), oy-1, c.cols-c.barX(), strip)
+	}
+	for _, d := range st.Dividers {
+		if !d.Vertical {
+			fill(scr, d.X, d.Y, d.Len, strip)
+		}
+	}
+	// Where a vertical divider meets the title row above it, continue it
+	// so the titles of side-by-side panes stay apart.
+	for _, d := range st.Dividers {
+		if d.Vertical && d.Y > 0 {
+			put(scr, d.X, d.Y-1, "│", uv.Style{Fg: t.Border, Bg: strip.Bg})
+		}
+	}
+	var tab protocol.TabInfo
+	if i := st.Active; i >= 0 && i < len(st.Tabs) {
+		tab = st.Tabs[i]
+	}
+	for _, p := range st.Panes {
+		y := p.Y - 1
+		if y < 0 {
+			continue
+		}
+		name, detail := paneTitle(p)
+		focused := p.ID == st.ActivePane
+		bg := t.Bar
+		nameSt := uv.Style{Fg: t.Muted, Bg: bg}
+		detailSt := uv.Style{Fg: t.Faint, Bg: bg}
+		if focused && len(st.Panes) > 1 {
+			// The focused pane's title row is lifted a shade.
+			bg = t.Surface
+			fill(scr, p.X, y, p.W, uv.Style{Bg: bg})
+		}
+		if focused {
+			nameSt = uv.Style{Fg: t.Text, Bg: bg, Attrs: uv.AttrBold}
+			detailSt = uv.Style{Fg: t.Muted, Bg: bg}
+		}
+		x, end := p.X+1, p.X+p.W-1
+		if p.Agent != "" && tab.Pinned {
+			glyph, gst := statusGlyph(t, tab.Status)
+			gst.Bg = bg
+			x = put(scr, x, y, glyph, gst) + 1
+		}
+		x = put(scr, x, y, runewidth.Truncate(name, max(end-x, 0), "…"), nameSt)
+		if detail != "" && end-x > 4 {
+			put(scr, x+2, y, clipLeft(detail, end-x-2), detailSt)
+		}
+	}
+}
+
+// paneTitle names what runs in a pane: the coding agent if there is one,
+// else the shell, and the folder it's in (or the title the program set).
+func paneTitle(p protocol.PaneInfo) (name, detail string) {
+	name = p.Program
+	if p.Agent != "" {
+		name = p.Agent
+	}
+	if name == "" {
+		name = "shell"
+	}
+	detail = shortPath(p.Cwd)
+	if detail == "" {
+		title := strings.TrimSpace(p.Title)
+		// Shells often set the title to their own path; that adds nothing.
+		low := strings.ToLower(title)
+		if title != "" && !strings.HasSuffix(low, strings.ToLower(p.Program)+".exe") &&
+			!strings.EqualFold(title, name) && !strings.EqualFold(title, p.Program) {
+			detail = title
+		}
+	}
+	return name, detail
 }
 
 func boxGlyph(up, down, left, right bool) string {
@@ -242,13 +332,14 @@ func boxGlyph(up, down, left, right bool) string {
 	return "│"
 }
 
-// drawStatus draws the bottom bar:
+// drawStatus draws the bottom bar. In the sidebar layout:
 //
-//	◆ api   web   infra │ 0 brewing  1 pondering ·2  +      Ctrl+B for shortcuts   14:32
+//	api  › brewing                  Ctrl+B  v split  c tab  Space commands   detach   14:32
 //
-// Every workspace is listed (click to switch), then the current workspace's
-// tabs (click to switch, + for a new one). While the prefix is pending the
-// whole bar turns into a key guide.
+// the current workspace (click to switch) and tab, then a few keys, a
+// detach button and the clock. In the two-bars layout it lists the
+// workspaces and watched tabs instead; in the compact one, workspaces and
+// tabs. While the prefix is pending the whole bar turns into a key guide.
 func (c *Client) drawStatus(s uv.Screen, y int) {
 	if y < 0 {
 		return
@@ -261,7 +352,7 @@ func (c *Client) drawStatus(s uv.Screen, y int) {
 	prefix := keys.Label(c.keys.Keymap().Prefix)
 
 	if c.keys.Pending() {
-		x := put(s, 1, y, " "+prefix+" ", uv.Style{Fg: hex(0x1c1c1e), Bg: t.Attn, Attrs: uv.AttrBold})
+		x := put(s, 0, y, " "+prefix+" ", uv.Style{Fg: AttnText, Bg: t.Attn, Attrs: uv.AttrBold})
 		x += 2
 		for _, h := range keys.Hints {
 			k := keys.Label(h.Key)
@@ -274,15 +365,18 @@ func (c *Client) drawStatus(s uv.Screen, y int) {
 		return
 	}
 
-	x := 1
+	x := 0
 	switch c.layout() {
 	case config.LayoutSidebar:
-		// The sidebar lists the workspaces; here, the current one and its tabs.
+		// The sidebar lists the workspaces and the top bar the tabs; here,
+		// where you are.
 		x0 := x
 		x = put(s, x, y, " "+c.state.Workspace+" ", uv.Style{Fg: t.OnAccent, Bg: t.Accent, Attrs: uv.AttrBold})
 		c.hits = append(c.hits, hit{x0, x, y, keys.Action{Name: keys.ActionChooseWorkspace}})
-		x = put(s, x, y, " │ ", uv.Style{Fg: t.Faint, Bg: t.Bar})
-		x = c.drawTabs(s, x, y)
+		if i := c.state.Active; i >= 0 && i < len(c.state.Tabs) {
+			x = put(s, x, y, "  ›  ", uv.Style{Fg: t.Faint, Bg: t.Bar})
+			x = put(s, x, y, c.state.Tabs[i].Name, uv.Style{Fg: t.Text, Bg: t.Bar})
+		}
 	case config.LayoutTwoBars:
 		// Tabs are in the top bar; this one lists the workspaces.
 		x = c.drawWorkspaces(s, x, y, c.cols/2)
@@ -292,10 +386,10 @@ func (c *Client) drawStatus(s uv.Screen, y int) {
 		x = c.drawPinnedChips(s, x, y, c.cols-45)
 	default:
 		x = c.drawWorkspaces(s, x, y, c.cols/2)
-		x = put(s, x, y, " │ ", uv.Style{Fg: t.Faint, Bg: t.Bar})
+		x = put(s, x, y, "  ", bar)
 		x = c.drawTabs(s, x, y)
 	}
-	c.drawRight(s, x, y, c.layout() != config.LayoutTwoBars)
+	c.drawRight(s, x, y, c.layout() == config.LayoutCompact)
 }
 
 // drawPinnedChips lists pinned tabs inline, for layouts without a sidebar.
@@ -305,7 +399,7 @@ func (c *Client) drawPinnedChips(s uv.Screen, x, y, limit int) int {
 	if len(c.state.Pinned) == 0 {
 		return x
 	}
-	x = put(s, x, y, " │ ", uv.Style{Fg: t.Faint, Bg: t.Bar})
+	x = put(s, x, y, "  ", uv.Style{Bg: t.Bar})
 	for _, p := range c.state.Pinned {
 		if x+runewidth.StringWidth(p.Name)+4 > limit {
 			break
@@ -321,18 +415,20 @@ func (c *Client) drawPinnedChips(s uv.Screen, x, y, limit int) int {
 	return x
 }
 
-// drawTopBar draws the tab bar used by the two-bars layout.
+// drawTopBar draws the tab bar along the top of the panes.
 func (c *Client) drawTopBar(s uv.Screen) {
 	t := c.theme
-	fill(s, 0, 0, c.cols, uv.Style{Bg: t.Bar})
-	x := c.drawTabs(s, 1, 0)
+	bx := c.barX()
+	fill(s, bx, 0, c.cols-bx, uv.Style{Bg: t.Bar})
+	x := c.drawTabs(s, c.ox(), 0)
 	if c.state.Zoomed && x+8 < c.cols {
-		put(s, c.cols-8, 0, " ZOOM ", uv.Style{Fg: hex(0x1c1c1e), Bg: t.Attn, Attrs: uv.AttrBold})
+		put(s, c.cols-7, 0, " ZOOM ", uv.Style{Fg: AttnText, Bg: t.Attn, Attrs: uv.AttrBold})
 	}
 }
 
 // drawTabs draws the current workspace's tabs and a + button, returning the
-// column after them.
+// column after them. The current tab is a raised chip; tabs with an agent
+// show its status.
 func (c *Client) drawTabs(s uv.Screen, x, y int) int {
 	t := c.theme
 	for i, tab := range c.state.Tabs {
@@ -352,11 +448,7 @@ func (c *Client) drawTabs(s uv.Screen, x, y int) int {
 			x = put(s, x, y, " ", uv.Style{Bg: bg})
 			x = put(s, x, y, glyph, gst)
 		}
-		x = put(s, x, y, " "+tab.Name, name)
-		if tab.Panes > 1 {
-			x = put(s, x, y, " ·"+fmt.Sprint(tab.Panes), uv.Style{Fg: t.Faint, Bg: bg})
-		}
-		x = put(s, x, y, " ", uv.Style{Bg: bg})
+		x = put(s, x, y, " "+tab.Name+" ", name)
 		c.hits = append(c.hits, hit{x0, x, y, keys.Action{Name: protocol.ActionSelectTab, Arg: fmt.Sprint(i)}})
 		x++
 	}
@@ -366,19 +458,16 @@ func (c *Client) drawTabs(s uv.Screen, x, y int) int {
 	return x
 }
 
-// drawRight draws the right end of the bottom bar: zoom badge (unless the
-// top bar shows it), detach button, prefix hint and clock. Segments that
-// don't fit after column x are dropped, the clock last.
+// drawRight draws the right end of the bottom bar: zoom badge (if no top
+// bar shows it), update notice, a few keys, detach button and clock.
+// Segments that don't fit after column x are dropped, least useful first:
+// the keys, then the clock, then detach.
 func (c *Client) drawRight(s uv.Screen, x, y int, showZoom bool) {
 	t := c.theme
 	bar := uv.Style{Bg: t.Bar}
 	key := uv.Style{Fg: t.Text, Bg: t.Bar, Attrs: uv.AttrBold}
 	label := uv.Style{Fg: t.Muted, Bg: t.Bar}
 	prefix := keys.Label(c.keys.Keymap().Prefix)
-	// Right side, built as segments and placed only if they fit.
-	// Each group is one item plus its trailing gap. When space runs out,
-	// the lowest-priority groups are dropped first: the shortcut hint, then
-	// the clock, then detach; an update notice and the zoom badge stay longest.
 	type seg struct {
 		text  string
 		style uv.Style
@@ -391,16 +480,20 @@ func (c *Client) drawRight(s uv.Screen, x, y int, showZoom bool) {
 	gap := seg{text: "   ", style: bar}
 	var groups []group
 	if showZoom && c.state.Zoomed {
-		groups = append(groups, group{5, []seg{{text: " ZOOM ", style: uv.Style{Fg: hex(0x1c1c1e), Bg: t.Attn, Attrs: uv.AttrBold}}, gap}})
+		groups = append(groups, group{5, []seg{{text: " ZOOM ", style: uv.Style{Fg: AttnText, Bg: t.Attn, Attrs: uv.AttrBold}}, gap}})
 	}
 	if c.updateBadge != "" {
 		groups = append(groups, group{4, []seg{{text: " ↑ " + c.updateBadge + " ", style: uv.Style{Fg: t.OnAccent, Bg: t.Accent},
 			act: &keys.Action{Name: keys.ActionSettings, Arg: "updates"}}, gap}})
 	}
+	hints := []seg{{text: prefix, style: key}}
+	for _, h := range [][2]string{{"v", "split"}, {"c", "tab"}, {"space", "commands"}} {
+		hints = append(hints, seg{text: "  " + keys.Label(h[0]), style: key}, seg{text: " " + h[1], style: label})
+	}
 	groups = append(groups,
+		group{1, append(hints, gap)},
 		group{3, []seg{{text: " detach ", style: uv.Style{Fg: t.Text, Bg: t.Raised}, act: &keys.Action{Name: keys.ActionDetach}}, gap}},
-		group{1, []seg{{text: prefix, style: key}, {text: " for shortcuts   ", style: label}}},
-		group{2, []seg{{text: time.Now().Format("15:04") + " ", style: uv.Style{Fg: t.Text, Bg: t.Bar}}}},
+		group{2, []seg{{text: time.Now().Format("15:04") + " ", style: uv.Style{Fg: t.Muted, Bg: t.Bar}}}},
 	)
 	width := func() int {
 		w := 0
@@ -538,33 +631,67 @@ func (c *Client) drawOverlay(s uv.Screen, o *overlay) (int, int) {
 			put(s, bx+3, o.rowsY, "No matches", uv.Style{Fg: t.Faint, Bg: t.Surface})
 		}
 		for r := 0; r < listRows && o.scroll+r < len(o.view); r++ {
-			c.drawItem(s, o.view[o.scroll+r], bx+1, o.rowsY+r, w-2, o.scroll+r == o.sel)
+			i := o.scroll + r
+			// Each group's name appears once, on its first row.
+			first := r == 0 || o.view[i-1].group != o.view[i].group
+			c.drawItem(s, o.view[i], bx+1, o.rowsY+r, w-2, i == o.sel, first)
 		}
 	}
-	put(s, bx+3, by+h-2, footer, uv.Style{Fg: t.Faint, Bg: t.Surface})
+	drawKeyHints(s, bx+3, by+h-2, footer, t, t.Surface)
 	return cursorX, iy
 }
 
-func (c *Client) drawItem(s uv.Screen, it item, x, y, w int, selected bool) {
+// drawKeyHints draws a hint line like "↑↓ select   enter run": in each
+// group of words, the first (the key) bright and the rest dim.
+func drawKeyHints(s uv.Screen, x, y int, line string, t Theme, bg color.Color) {
+	for i, part := range strings.Split(line, "   ") {
+		if i > 0 {
+			x = put(s, x, y, "   ", uv.Style{Bg: bg})
+		}
+		k, rest, _ := strings.Cut(part, " ")
+		x = put(s, x, y, k, uv.Style{Fg: t.Text, Bg: bg, Attrs: uv.AttrBold})
+		if rest != "" {
+			x = put(s, x, y, " "+rest, uv.Style{Fg: t.Faint, Bg: bg})
+		}
+	}
+}
+
+// drawItem draws one row of a list panel. The selected row is raised, with
+// a marker in the accent colour; a key binding hint like "Ctrl+B  v" shows
+// the prefix dim and the key bright.
+func (c *Client) drawItem(s uv.Screen, it item, x, y, w int, selected, showGroup bool) {
 	t := c.theme
-	bg, fg, dim, hintFg := t.Surface, t.Text, t.Faint, t.Muted
+	bg := t.Surface
+	labelSt := uv.Style{Fg: t.Text, Bg: bg}
 	if selected {
-		bg, fg, dim, hintFg = t.Accent, t.OnAccent, t.OnAccent, t.OnAccent
+		bg = t.Raised
+		labelSt = uv.Style{Fg: t.Text, Bg: bg, Attrs: uv.AttrBold}
 	}
 	fill(s, x, y, w, uv.Style{Bg: bg})
-	cx := x + 2
-	if it.group != "" {
-		put(s, cx, y, it.group, uv.Style{Fg: dim, Bg: bg})
-		cx += 11
+	if selected {
+		put(s, x+1, y, "›", uv.Style{Fg: t.Accent, Bg: bg, Attrs: uv.AttrBold})
 	}
-	label := it.label
-	if it.current {
-		label += "  ●"
+	cx := x + 3
+	if it.group != "" {
+		if showGroup || selected {
+			put(s, cx, y, it.group, uv.Style{Fg: t.Faint, Bg: bg})
+		}
+		cx += 10
 	}
 	hintW := runewidth.StringWidth(it.hint)
-	put(s, cx, y, runewidth.Truncate(label, max(x+w-cx-hintW-3, 1), "…"), uv.Style{Fg: fg, Bg: bg})
+	label := runewidth.Truncate(it.label, max(x+w-cx-hintW-6, 1), "…")
+	lx := put(s, cx, y, label, labelSt)
+	if it.current {
+		put(s, lx+2, y, "current", uv.Style{Fg: t.Accent, Bg: bg})
+	}
 	if it.hint != "" {
-		put(s, x+w-hintW-2, y, it.hint, uv.Style{Fg: hintFg, Bg: bg})
+		hx := x + w - hintW - 2
+		if pre, k, ok := strings.Cut(it.hint, "  "); ok {
+			hx = put(s, hx, y, pre+"  ", uv.Style{Fg: t.Faint, Bg: bg})
+			put(s, hx, y, k, uv.Style{Fg: t.Text, Bg: bg, Attrs: uv.AttrBold})
+		} else {
+			put(s, hx, y, it.hint, uv.Style{Fg: t.Muted, Bg: bg})
+		}
 	}
 }
 
