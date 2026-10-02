@@ -266,3 +266,48 @@ func shortTempDir(t *testing.T) string {
 	t.Cleanup(func() { _ = os.RemoveAll(dir) })
 	return dir
 }
+
+// TestSynchronizedUpdateArrivesWhole has a real shell write one synchronized
+// update (mode 2026) in pieces with pauses between them, as agents redrawing
+// a large screen do, and checks clients get it as one Output frame instead of
+// drawing it half done.
+func TestSynchronizedUpdateArrivesWhole(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("needs a POSIX shell")
+	}
+	sock := filepath.Join(shortTempDir(t), "t.sock")
+	t.Setenv("OTMUX_SOCKET", sock)
+	t.Setenv("OTMUX_CONFIG", filepath.Join(t.TempDir(), "config.json"))
+	t.Setenv("OTMUX_SHELL", "/bin/sh")
+	go func() { _ = daemon.Run() }()
+	t.Cleanup(func() {
+		k := attachRaw(t, sock)
+		_ = k.Send(protocol.TypeCommand, protocol.Command{Action: protocol.ActionKillServer})
+	})
+
+	c := attach(t, sock)
+	pane := c.waitState(t, func(s protocol.State) bool { return len(s.Panes) == 1 }).ActivePane
+	typeLine(t, c, pane, `printf '\033[?2026h'; for i in 1 2 3 4 5; do printf "pt$i. "; sleep 0.01; done; printf '\033[?2026l\n'`)
+
+	timeout := time.After(20 * time.Second)
+	for {
+		select {
+		case f, open := <-c.frames:
+			if !open {
+				t.Fatal("connection closed")
+			}
+			if f.Type != protocol.TypeOutput {
+				continue
+			}
+			_, data, _ := protocol.DecodeOutput(f.Payload)
+			if s := string(data); strings.Contains(s, "pt1. ") {
+				if !strings.Contains(s, "pt5. ") {
+					t.Fatalf("update arrived in parts; first frame: %q", s)
+				}
+				return
+			}
+		case <-timeout:
+			t.Fatal("timed out waiting for the update")
+		}
+	}
+}

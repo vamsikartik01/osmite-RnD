@@ -46,6 +46,14 @@ type Pane struct {
 	lastPoke     time.Time // when the user last typed into or resized the pane
 	typed        bool      // the user has typed or pasted into the pane
 	exited       bool
+
+	// Output held back to send as whole updates; see batch.go.
+	pending    []byte
+	flushArmed bool
+	flushGen   int       // bumped by each flush, so an armed timer knows it's stale
+	inFrame    bool      // inside a synchronized update (mode 2026)
+	frameStart time.Time // when that update (or its last flushed part) began
+	frameEnded bool      // an update ended since the last flush
 }
 
 func newPane(id uint32, argv []string, dir string, cols, rows int) (*Pane, error) {
@@ -69,13 +77,16 @@ func newPane(id uint32, argv []string, dir string, cols, rows int) (*Pane, error
 		pane.program = strings.TrimSuffix(filepath.Base(argv[0]), filepath.Ext(argv[0]))
 	}
 	pane.emu.SetScrollbackSize(scrollbackLines)
+	// Programs ask whether synchronized updates are supported (DECRQM) before
+	// using them, and the emulator only recognises modes that were set once.
+	_, _ = pane.emu.WriteString(ansi.SetModeSynchronizedOutput + ansi.ResetModeSynchronizedOutput)
 	pane.emu.SetCallbacks(vt.Callbacks{
 		Title: func(t string) {
 			pane.title = t
 			pane.stateChanged = true
 		},
-		EnableMode:       func(m ansi.Mode) { pane.setMouseMode(m, true) },
-		DisableMode:      func(m ansi.Mode) { pane.setMouseMode(m, false) },
+		EnableMode:       func(m ansi.Mode) { pane.setMode(m, true) },
+		DisableMode:      func(m ansi.Mode) { pane.setMode(m, false) },
 		CursorVisibility: func(visible bool) { pane.cursorHidden = !visible },
 		Bell:             func() { pane.notified = true },
 		WorkingDirectory: func(u string) {
@@ -101,8 +112,10 @@ func newPane(id uint32, argv []string, dir string, cols, rows int) (*Pane, error
 	return pane, nil
 }
 
-func (p *Pane) setMouseMode(m ansi.Mode, on bool) {
+func (p *Pane) setMode(m ansi.Mode, on bool) {
 	switch m {
+	case ansi.ModeSynchronizedOutput:
+		p.setFrame(on)
 	case ansi.ModeMouseX10, ansi.ModeMouseNormal, ansi.ModeMouseButtonEvent, ansi.ModeMouseAnyEvent:
 		if p.mouseModes[m] != on {
 			p.mouseModes[m] = on

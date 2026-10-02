@@ -124,10 +124,13 @@ type client struct {
 	cols, rows int
 	scroll     map[uint32]int // pane -> lines scrolled back with the wheel
 	closed     bool
+
+	historyDue   map[uint32]*Pane // scrollback views to redraw; see queueHistory
+	historyArmed bool
 }
 
 func (s *Server) newClient(conn *protocol.Conn, h protocol.Hello) *client {
-	c := &client{conn: conn, out: make(chan []byte, clientQueue), dir: h.Dir, cols: h.Cols, rows: h.Rows, scroll: map[uint32]int{}}
+	c := &client{conn: conn, out: make(chan []byte, clientQueue), dir: h.Dir, cols: h.Cols, rows: h.Rows, scroll: map[uint32]int{}, historyDue: map[uint32]*Pane{}}
 	s.writers.Add(1)
 	go func() {
 		defer s.writers.Done()
@@ -445,6 +448,7 @@ func (s *Server) handle(c *client, f protocol.Frame) {
 		}
 		if in.Key != nil || in.Paste != "" {
 			delete(c.scroll, p.id) // typing returns to the live screen
+			delete(c.historyDue, p.id)
 			if !p.typed {
 				p.typed = true
 				defer s.broadcastState(ws) // the pane is no longer fresh
@@ -519,6 +523,7 @@ func (s *Server) command(c *client, cmd protocol.Command) {
 	case protocol.ActionScrollReset:
 		id, _ := strconv.ParseUint(cmd.Arg, 10, 32)
 		delete(c.scroll, uint32(id))
+		delete(c.historyDue, uint32(id))
 		return
 
 	// Panes.
@@ -687,7 +692,7 @@ func (s *Server) wheel(c *client, p *Pane, in protocol.Input) {
 		} else {
 			c.scroll[p.id] = off
 		}
-		c.queueJSON(protocol.TypeHistory, p.history(off))
+		s.queueHistory(c, p)
 	}
 }
 
@@ -809,10 +814,7 @@ func (s *Server) pumpOutput(p *Pane) {
 				_, _ = p.emu.Write(buf[:n])
 				p.noteOutput(time.Now())
 				if p.visible() {
-					frame := protocol.EncodeFrame(protocol.TypeOutput, protocol.EncodeOutput(p.id, buf[:n]))
-					for c := range p.ws.clients {
-						c.queue(frame)
-					}
+					s.queueOutput(p, buf[:n])
 				}
 				if p.stateChanged {
 					p.stateChanged = false
@@ -926,7 +928,9 @@ func (s *Server) broadcastStates() {
 // sendView sends c the layout and a snapshot of every visible pane.
 func (s *Server) sendView(c *client) {
 	ws := c.ws
+	s.flushWorkspace(ws)
 	c.scroll = map[uint32]int{} // fresh snapshots replace any history view
+	clear(c.historyDue)
 	if t := ws.activeTab(); t != nil {
 		t.attention = false // the user is looking at it now
 	}
