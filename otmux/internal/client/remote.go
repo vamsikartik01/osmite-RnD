@@ -225,9 +225,9 @@ func (c *Client) remoteBadge() (string, bool) {
 	case st == nil:
 		return "", false
 	case st.Sessions == 1:
-		return "◉ 1 browser", false
+		return "● 1 browser", false
 	case st.Sessions > 1:
-		return fmt.Sprintf("◉ %d browsers", st.Sessions), false
+		return fmt.Sprintf("● %d browsers", st.Sessions), false
 	case st.State == protocol.RemoteStopped:
 		return "remote stopped", true
 	}

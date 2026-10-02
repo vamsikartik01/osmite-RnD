@@ -36,6 +36,15 @@ const (
 	sessionQueue = 1024
 )
 
+// pingInterval is how often the daemon checks the connection is alive
+// itself. The server pings too, but after a laptop sleeps a dead TCP
+// connection can look open for minutes; our own ping notices within
+// pingInterval + pingTimeout and reconnects.
+var (
+	pingInterval = 30 * time.Second
+	pingTimeout  = 15 * time.Second
+)
+
 // Agent keeps the daemon's connection to the remote server while remote
 // mode is on. Each browser session the server opens becomes a new local
 // client: serve gets one end of an in-memory pipe and speaks the ordinary
@@ -91,6 +100,11 @@ func (g *Agent) Reload() {
 	g.reload.Lock()
 	defer g.reload.Unlock()
 	a, err := Load()
+	for i := 0; err != nil && i < 5; i++ {
+		// On Windows the file can be mid-replace while the client saves it.
+		time.Sleep(50 * time.Millisecond)
+		a, err = Load()
+	}
 	if err != nil {
 		log.Printf("remote: %v", err)
 	}
@@ -257,6 +271,9 @@ func (g *Agent) connect(ctx context.Context, a Account) error {
 		g.setStatus(func(s *protocol.RemoteStatus) { s.Sessions = n })
 	}}
 	defer m2.closeAll()
+	pctx, stopPing := context.WithCancel(ctx)
+	defer stopPing()
+	go keepAlive(pctx, c)
 	err = m2.readLoop()
 	switch websocket.CloseStatus(err) {
 	case closeRevoked:
@@ -267,6 +284,28 @@ func (g *Agent) connect(ctx context.Context, a Account) error {
 		return errStop{"Another otmux using this account file took over the remote connection."}
 	}
 	return err
+}
+
+// keepAlive pings the server and drops the connection when it stops
+// answering, so the read loop ends and the agent reconnects.
+func keepAlive(ctx context.Context, c *websocket.Conn) {
+	t := time.NewTicker(pingInterval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+		}
+		pctx, cancel := context.WithTimeout(ctx, pingTimeout)
+		err := c.Ping(pctx)
+		cancel()
+		if err != nil && ctx.Err() == nil {
+			log.Printf("remote: server stopped answering pings, reconnecting")
+			c.CloseNow()
+			return
+		}
+	}
 }
 
 // mux routes one socket's messages to and from its browser sessions.

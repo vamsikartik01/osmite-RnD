@@ -334,3 +334,26 @@ func TestAgentReplaced(t *testing.T) {
 	case <-time.After(1500 * time.Millisecond):
 	}
 }
+
+// A server that stops answering (a laptop woke up on a dead connection)
+// is noticed by the agent's own pings, and it reconnects.
+func TestAgentDeadConnection(t *testing.T) {
+	oldI, oldT := pingInterval, pingTimeout
+	pingInterval, pingTimeout = 200*time.Millisecond, 300*time.Millisecond
+	defer func() { pingInterval, pingTimeout = oldI, oldT }()
+
+	f := newFakeServer(t) // after the hello it never reads, so pings go unanswered
+	linked(t, f.URL)
+	st := statuses{make(chan protocol.RemoteStatus, 64)}
+	g := NewAgent(echoServe, func(s protocol.RemoteStatus) { st.ch <- s })
+	g.Reload()
+	defer g.Stop()
+	<-f.hellos
+	<-f.conns
+	st.wait(t, func(s protocol.RemoteStatus) bool { return s.State == protocol.RemoteRetrying })
+	select {
+	case <-f.hellos:
+	case <-time.After(10 * time.Second):
+		t.Fatal("did not reconnect after the server stopped answering")
+	}
+}
