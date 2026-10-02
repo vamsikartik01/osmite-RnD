@@ -29,10 +29,12 @@ func (c *Client) startUpdates(daemonVersion string) {
 	case daemonVersion != "" && daemonVersion != version.Version:
 		// The program was updated but the running daemon is still the old one.
 		c.updateBadge = fmt.Sprintf("updated to %s · restart to finish", version.Version)
+		c.updateTarget, c.updateSince = version.Version, daemonVersion
 		c.updateStatus = fmt.Sprintf("otmux %s is installed, but the background service is still %s. "+
 			"Run `otmux restart` to finish (this closes running shells).", version.Version, daemonVersion)
 	case st.Installed != "" && update.Newer(st.Installed, version.Version):
 		c.updateBadge = fmt.Sprintf("%s installed · restart to finish", st.Installed)
+		c.updateTarget, c.updateSince = st.Installed, version.Version
 		c.updateStatus = fmt.Sprintf("otmux %s is installed and starts next time you run otmux.", st.Installed)
 	}
 	auto := c.cfg.AutoUpdateOn() && !update.Disabled() && st.Due(time.Now())
@@ -87,6 +89,7 @@ func (c *Client) checkUpdates(manual bool) {
 	case r.Installed:
 		st.Installed = r.Latest
 		c.updateBadge = fmt.Sprintf("%s installed · restart to finish", r.Latest)
+		c.updateTarget, c.updateSince = r.Latest, version.Version
 		c.updateStatus = fmt.Sprintf("otmux %s is installed. It starts next time you run otmux; "+
 			"run `otmux restart` to restart the background service too (this closes running shells).", r.Latest)
 	default:

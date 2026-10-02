@@ -166,6 +166,11 @@ func (c *Client) settingsRows(sec int) []settingsRow {
 			go c.checkUpdates(true)
 			return keys.Action{}, false
 		}})
+		if c.updateTarget != "" {
+			rows = append(rows, settingsRow{left: "What's new in " + c.updateTarget + ", and restart…", run: func(c *Client) (keys.Action, bool) {
+				return keys.Action{Name: actionUpdatePanel}, true
+			}})
+		}
 	case secRemote:
 		rows = c.remoteRows()
 	}

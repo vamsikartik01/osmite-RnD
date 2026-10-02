@@ -66,6 +66,10 @@ type Client struct {
 	updateBusy   bool
 	updateBadge  string            // short note for the status bar, e.g. "1.1.0 installed · restart to finish"
 	updateStatus string            // longer note for Settings › Updates
+	updateTarget string            // installed version waiting for a restart, if any
+	updateSince  string            // the version it replaces, for "what's new"
+	upd          *updatePanel      // the update panel, while open
+	restart      bool              // the user chose Restart now
 	drag         *protocol.Divider // divider being dragged with the mouse
 	sel          *selection        // mouse text selection
 	hits         []hit             // clickable status bar regions, set by render
@@ -181,6 +185,12 @@ func Attach(opts Options) (string, error) {
 	reason := c.eventLoop()
 
 	_ = term.Stop()
+	c.mu.Lock()
+	restart := c.restart
+	c.mu.Unlock()
+	if restart {
+		return "", ErrRestart
+	}
 	return reason, nil
 }
 
@@ -403,8 +413,14 @@ func (c *Client) handleEvent(ev uv.Event) (string, bool) {
 
 func (c *Client) handleKey(k uv.KeyPressEvent) (string, bool) {
 	c.mu.Lock()
-	ov, set := c.overlay, c.settings
+	ov, set, upd := c.overlay, c.settings, c.upd
 	c.mu.Unlock()
+	if upd != nil {
+		if act, ok := c.updatePanelKey(k); ok {
+			return c.run(act, k)
+		}
+		return "", false
+	}
 	if set != nil {
 		if act, ok := c.settingsKey(k); ok {
 			return c.run(act, k)
@@ -446,6 +462,15 @@ func (c *Client) run(act keys.Action, k uv.KeyPressEvent) (string, bool) {
 	case "":
 	case keys.ActionDetach:
 		return "detached from workspace " + wsName, true
+	case actionUpdatePanel:
+		c.mu.Lock()
+		c.openUpdatePanel()
+		c.mu.Unlock()
+	case actionRestartNow:
+		c.mu.Lock()
+		c.restart = true
+		c.mu.Unlock()
+		return "restarting otmux", true
 	case keys.ActionSendPrefix:
 		c.sendKey(k)
 	case keys.ActionPalette:
@@ -513,7 +538,7 @@ func (c *Client) openOverlay(o *overlay) {
 func (c *Client) handleMouse(kind protocol.MouseKind, m uv.Mouse) (string, bool) {
 	c.mu.Lock()
 	st := c.state
-	ov, set := c.overlay, c.settings
+	ov, set, upd := c.overlay, c.settings, c.upd
 	drag := c.drag
 	sel := c.sel
 	statusRow := m.Y == c.rows-1
@@ -523,6 +548,12 @@ func (c *Client) handleMouse(kind protocol.MouseKind, m uv.Mouse) (string, bool)
 	left := m.Button == uv.MouseLeft
 	right := m.Button == uv.MouseRight
 
+	if upd != nil {
+		if act, ok := c.updatePanelMouse(kind, m.Button, m.X, m.Y); ok {
+			return c.run(act, uv.KeyPressEvent{})
+		}
+		return "", false
+	}
 	if ov != nil {
 		return c.overlayMouse(ov, kind, m)
 	}

@@ -20,7 +20,8 @@ import (
 // TestTUIUpdate runs otmux against a fake release announcing version 9.9.9
 // (whose binary is a copy of this build, so the swapped-in file still
 // works). It checks the automatic update at start-up, the status bar
-// notice, and Settings › Updates with its "Update now" button.
+// notice and the update panel it opens, Settings › Updates with its
+// "Update now" button, and restarting from the panel.
 func TestTUIUpdate(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds and drives the real binary")
@@ -70,8 +71,20 @@ func TestTUIUpdate(t *testing.T) {
 		t.Fatalf("swapped-in program doesn't run: %q", out)
 	}
 
-	// Clicking the notice opens Settings › Updates.
+	// Clicking the notice opens the update panel; Later closes it.
 	term.clickStatus(t, "9.9.9 installed")
+	term.waitFor(t, "update panel", func(s string) bool {
+		return strings.Contains(s, "otmux 9.9.9 is installed") && strings.Contains(s, "What's new") &&
+			strings.Contains(s, "Restart now") && strings.Contains(s, "otmux restart")
+	})
+	t.Logf("update panel:\n%s", term.screen())
+	term.click(t, "Later")
+	term.waitFor(t, "panel closed", func(s string) bool { return !strings.Contains(s, "What's new") })
+
+	// Settings › Updates.
+	term.typ("\x02s")
+	term.waitFor(t, "settings", func(s string) bool { return strings.Contains(s, "Updates") })
+	term.click(t, "Updates")
 	term.waitFor(t, "updates section", func(s string) bool {
 		return strings.Contains(s, "Auto update") && strings.Contains(s, "Update now") && strings.Contains(s, "Latest     9.9.9")
 	})
@@ -95,5 +108,34 @@ func TestTUIUpdate(t *testing.T) {
 			t.Fatalf("settings after turning auto update off: %s\nscreen:\n%s", data, term.screen())
 		}
 		time.Sleep(50 * time.Millisecond)
+	}
+
+	// Restart now asks first; Cancel goes back without closing anything.
+	term.typ("\x1b")
+	term.waitFor(t, "settings closed", func(s string) bool { return !strings.Contains(s, "Auto update") })
+	time.Sleep(700 * time.Millisecond)
+	term.clickStatus(t, "9.9.9 installed")
+	term.waitFor(t, "update panel again", func(s string) bool { return strings.Contains(s, "Restart now") })
+	term.click(t, "Restart now")
+	term.waitFor(t, "confirmation", func(s string) bool {
+		return strings.Contains(s, "Yes, restart") && strings.Contains(s, "Close 1 tab and restart otmux?")
+	})
+	time.Sleep(700 * time.Millisecond)
+	term.click(t, "Cancel")
+	term.waitFor(t, "cancelled", func(s string) bool { return strings.Contains(s, "Restart now") })
+	if out := runOtmux(t, env, bin, "ls"); !strings.Contains(out, "up") {
+		t.Fatalf("cancel closed the workspace: ls = %q", out)
+	}
+
+	// Yes, restart: otmux stops the daemon and opens again on a fresh one
+	// from the installed program, in the same terminal.
+	time.Sleep(700 * time.Millisecond)
+	term.click(t, "Restart now")
+	term.waitFor(t, "confirmation again", func(s string) bool { return strings.Contains(s, "Yes, restart") })
+	time.Sleep(700 * time.Millisecond)
+	term.click(t, "Yes, restart")
+	term.waitFor(t, "reopened", func(s string) bool { return currentWS(s, "default") })
+	if out := runOtmux(t, env, bin, "ls"); strings.Contains(out, "up") || !strings.Contains(out, "default") {
+		t.Fatalf("after restarting from the panel, ls = %q", out)
 	}
 }

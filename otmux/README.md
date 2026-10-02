@@ -79,6 +79,7 @@ otmux kill-server       stop the daemon and every shell
 otmux restart           stop the daemon and every shell, then open otmux again
 otmux keys              print all key bindings
 otmux update            update to the latest release
+otmux changes [version] what changed since a version
 otmux version
 ```
 
@@ -180,8 +181,8 @@ here and in the tab bar.
 | | |
 |---|---|
 | ● (blinking) | the agent is thinking / working: producing output by itself |
-| ◉ (yellow) | the agent is idle at its prompt, waiting for you, whether or not you're on the tab |
-| ○ | a tab you watch by hand, with no agent in it |
+| ◉ (yellow) | the agent wants you: it finished, rang the bell or sent a notification while you weren't on the tab |
+| ○ | idle: an agent at its prompt with nothing new, or a tab you watch by hand |
 
 Output right after you type or resize doesn't count as working, so typing
 into an agent's prompt doesn't make it blink.
@@ -240,8 +241,9 @@ between the menu and the list, and `enter` to choose.
   text on the main backgrounds, 4.5:1 for secondary text, and 3:1 for ANSI
   colours.
 - **Keys:** choose the prefix: `ctrl+b`, `ctrl+a`, `ctrl+space` or `ctrl+g`.
-- **Updates:** automatic updates on or off, *Update now*, and the installed
-  and latest versions. See [Updates](#updates).
+- **Updates:** automatic updates on or off, *Update now*, the installed
+  and latest versions, and what's new once an update is waiting for a
+  restart. See [Updates](#updates).
 - **About:** the version, and where the settings, socket and log are.
 
 Settings are stored as JSON in `%AppData%\otmux\config.json` on Windows,
@@ -254,9 +256,12 @@ otmux keeps itself up to date. Once a day it checks the latest release in the
 background, downloads the new version, verifies it against the release's
 SHA-256 checksums, and swaps it in for the program file. **Nothing is
 restarted**: your shells keep running, and the status bar shows
-`↑ 1.2.0 installed · restart to finish`. The new version starts the next time
-you run `otmux`; run `otmux restart` to put the background service on the
-new version too (that closes running shells, after asking).
+`↑ 1.2.0 installed · restart to finish`. Click it to see what's new in that
+version and restart into it with **Restart now**. otmux asks first, since a
+restart closes every shell and the programs in them, then opens again on the
+new version. Or keep working: the new version starts the next time you run
+`otmux`, and `otmux restart` in a terminal puts the background service on it
+too (also after asking).
 
 - Turn it off in **Settings › Updates**, or with `OTMUX_NO_UPDATE=1`.
 - Update straight away with **Settings › Updates › Update now** or

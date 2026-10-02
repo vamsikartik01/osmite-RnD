@@ -7,6 +7,22 @@ All notable changes to otmux are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-10-02
+
+### Added
+
+- Restart into a new version from otmux itself. Clicking the update notice in
+  the status bar shows what's new in the installed version and a Restart now
+  button. otmux asks before closing your shells, then opens again on the new
+  version. Works on Windows, macOS and Linux. Settings › Updates links to it
+  too, and `otmux changes` prints what changed since a version.
+
+### Changed
+
+- An agent sitting at its prompt shows as idle (○) instead of waiting. The
+  watch list shows waiting (◉) only when the agent wants you: it finished, rang
+  the bell or sent a notification while you weren't on its tab.
+
 ## [1.3.1] - 2026-10-02
 
 ### Changed
@@ -152,7 +168,8 @@ published from the same code.
 - **Install**: a one-line PowerShell installer and fixed download links to
   the newest version.
 
-[Unreleased]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.3.1...HEAD
+[Unreleased]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.3.2...HEAD
+[1.3.2]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.3.1...otmux/v1.3.2
 [1.3.1]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.3.0...otmux/v1.3.1
 [1.3.0]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.2.0...otmux/v1.3.0
 [1.2.0]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.4...otmux/v1.2.0

@@ -19,6 +19,7 @@ import (
 
 	xterm "github.com/charmbracelet/x/term"
 
+	"github.com/vamsikartik01/osmite-RnD/otmux"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/client"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/config"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/daemon"
@@ -42,6 +43,7 @@ Usage:
                             again (e.g. to start a new version); -y skips asking
   otmux keys                list key bindings
   otmux update              update otmux to the latest release
+  otmux changes [version]   what changed since version (default: this version)
   otmux version
 
 Inside otmux, press %[1]s then:
@@ -102,6 +104,9 @@ func run(args []string) error {
 		return restart(arg() == "-y" || arg() == "--yes")
 	case "update":
 		return selfUpdate()
+	case "changes":
+		printChanges(arg())
+		return nil
 	case "keys":
 		printKeys()
 		return nil
@@ -138,7 +143,16 @@ func attach(workspace, mode string) error {
 	if p, ok := cfg.Profile(workspace); ok {
 		opts.Dir = p.Path // a saved workspace opens in its folder
 	}
+	// The program file as it is now: an update while attached replaces it,
+	// and restarting from the update panel runs the new one.
+	exe, exeErr := update.Executable()
 	reason, err := client.Attach(opts)
+	if errors.Is(err, client.ErrRestart) {
+		if exeErr != nil {
+			return exeErr
+		}
+		return platform.Replace(exe, []string{"restart", "-y"})
+	}
 	if err != nil {
 		return err
 	}
@@ -171,6 +185,18 @@ func selfUpdate() error {
 	fmt.Printf("Updated otmux %s -> %s.\n", version.Version, r.Latest)
 	fmt.Println("It starts next time you run otmux. To restart the background service too, run `otmux kill-server` (this closes running shells).")
 	return nil
+}
+
+// printChanges prints the changelog entries after version since, up to
+// this version: each version on a line, then its points as "- " lines.
+// otmux reads this from a newly installed copy to show what's new.
+func printChanges(since string) {
+	for _, r := range update.Notes(otmux.Changelog, since, version.Version) {
+		fmt.Println(r.Version)
+		for _, it := range r.Items {
+			fmt.Println("- " + it)
+		}
+	}
 }
 
 func printKeys() {

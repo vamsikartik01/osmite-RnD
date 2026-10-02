@@ -53,3 +53,17 @@ func OpenURL(url string) error {
 	go func() { _ = cmd.Wait() }()
 	return nil
 }
+
+// Replace runs the program at path with args in the same console and exits
+// with its exit code once it ends: Windows can't replace a running process.
+// It returns only if the program couldn't start.
+func Replace(path string, args []string) error {
+	cmd := exec.Command(path, args...)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	_ = cmd.Wait()
+	os.Exit(cmd.ProcessState.ExitCode())
+	return nil
+}

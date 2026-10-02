@@ -40,8 +40,8 @@ func main() {
 `
 
 // TestAgentPinning runs a program called "claude" in a pane and checks its
-// tab pins itself, shows working then waiting, can be jumped to from
-// another tab, and stays unpinned once the user unpins it.
+// tab pins itself, shows working, waiting on a notification and idle once
+// it stops in view, can be jumped to from another tab, and stays unpinned once the user unpins it.
 func TestAgentPinning(t *testing.T) {
 	if testing.Short() {
 		t.Skip("builds a fake agent")
@@ -112,9 +112,9 @@ func TestAgentPinning(t *testing.T) {
 		return s.Active == 0 && len(s.Pinned) == 1 && s.Pinned[0].Status != protocol.StatusWaiting
 	})
 
-	// Once it stops spinning it's waiting for us, even though we're looking.
+	// It stops spinning while we're looking, so it's idle, not waiting.
 	c.waitState(t, func(s protocol.State) bool {
-		return s.Active == 0 && len(s.Pinned) == 1 && s.Pinned[0].Status == protocol.StatusWaiting
+		return s.Active == 0 && len(s.Pinned) == 1 && s.Pinned[0].Status == protocol.StatusIdle
 	})
 
 	// Unpinning by hand sticks even though the agent is still running.

@@ -91,6 +91,10 @@ func (c *Client) render() {
 		x, y := c.drawSettings(scr, c.settings)
 		cursorX, cursorY, showCursor = x, y, x >= 0
 	}
+	if c.upd != nil {
+		c.drawUpdatePanel(scr, c.upd)
+		showCursor = false
+	}
 
 	if showCursor {
 		scr.SetCursorPosition(cursorX, cursorY)
@@ -477,7 +481,7 @@ func (c *Client) drawRight(s uv.Screen, x, y int, showZoom bool) {
 	}
 	if c.updateBadge != "" {
 		groups = append(groups, group{4, []seg{{text: " ↑ " + c.updateBadge + " ", style: uv.Style{Fg: t.OnAccent, Bg: t.Accent},
-			act: &keys.Action{Name: keys.ActionSettings, Arg: "updates"}}, gap}})
+			act: &keys.Action{Name: actionUpdatePanel}}, gap}})
 	}
 	if badge, attn := c.remoteBadge(); badge != "" {
 		st := uv.Style{Fg: t.OnAccent, Bg: t.Accent}

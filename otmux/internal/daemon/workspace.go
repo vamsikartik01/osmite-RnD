@@ -40,7 +40,7 @@ type Tab struct {
 	pin       *bool  // the user's choice; nil means automatic
 	pinSeq    uint64 // order in the pinned list
 	working   bool   // an agent is producing output by itself
-	attention bool   // rang the bell or sent a notification while unwatched
+	attention bool   // rang the bell, sent a notification or finished while unwatched
 }
 
 // agent returns the coding agent running in any of the tab's panes.
@@ -60,18 +60,17 @@ func (t *Tab) pinned() bool {
 	return t.agent() != ""
 }
 
-// status describes what the tab's agent is doing, whether or not anyone is
-// looking: working while it produces output by itself, waiting when it's
-// idle at its prompt. A bell or notification while unwatched also means
-// waiting, even mid-spinner (e.g. a permission prompt).
+// status describes what the tab's agent is doing: working while it
+// produces output by itself, waiting when it wants you (it rang the bell,
+// sent a notification or finished while nobody was looking, even
+// mid-spinner, e.g. a permission prompt), and idle otherwise. Looking at the
+// tab clears waiting.
 func (t *Tab) status() string {
 	switch {
 	case t.attention:
 		return protocol.StatusWaiting
 	case t.working:
 		return protocol.StatusWorking
-	case t.agent() != "":
-		return protocol.StatusWaiting
 	}
 	return protocol.StatusIdle
 }

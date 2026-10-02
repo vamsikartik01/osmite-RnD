@@ -47,3 +47,9 @@ func OpenURL(url string) error {
 	go func() { _ = cmd.Wait() }()
 	return nil
 }
+
+// Replace runs the program at path with args in place of this process, in
+// the same terminal. It returns only if that fails.
+func Replace(path string, args []string) error {
+	return syscall.Exec(path, append([]string{path}, args...), os.Environ())
+}

@@ -83,6 +83,8 @@ func (s *Server) scanAgents() {
 			}
 			if ws.watched(t) {
 				t.attention = false
+			} else if t.working && !recent {
+				t.attention = true // finished while nobody was looking: your turn
 			}
 			t.working = recent
 			if t.pinned() && !wasPinned {
