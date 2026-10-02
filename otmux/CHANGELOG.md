@@ -7,6 +7,11 @@ All notable changes to otmux are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Only official release builds update themselves; a copy built from source
+  shows `(built from source)` in `otmux version` and is never replaced.
+
 ## [1.1.0] - 2026-10-02
 
 ### Added

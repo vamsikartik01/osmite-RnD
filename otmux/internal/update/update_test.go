@@ -17,6 +17,21 @@ import (
 	"time"
 )
 
+func TestMain(m *testing.M) {
+	official = func() bool { return true } // tests stand in for release builds
+	os.Exit(m.Run())
+}
+
+func TestSourceBuildsDontUpdate(t *testing.T) {
+	official = func() bool { return false }
+	defer func() { official = func() bool { return true } }()
+	exe := filepath.Join(t.TempDir(), "otmux.exe")
+	_ = os.WriteFile(exe, []byte("old"), 0o755)
+	if _, err := Run(context.Background(), exe, "1.0.0"); !errors.Is(err, ErrNotManaged) {
+		t.Fatalf("source build: err = %v, want ErrNotManaged", err)
+	}
+}
+
 func TestNewer(t *testing.T) {
 	cases := []struct {
 		a, b string

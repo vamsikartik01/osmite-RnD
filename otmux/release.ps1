@@ -38,7 +38,7 @@ foreach ($t in $targets) {
     New-Item -ItemType Directory "build/$name" | Out-Null
 
     $env:GOOS = $os; $env:GOARCH = $arch
-    go build -trimpath -ldflags "-s -w -X github.com/vamsikartik01/osmite-RnD/otmux/internal/version.Version=$Version" `
+    go build -trimpath -ldflags "-s -w -X github.com/vamsikartik01/osmite-RnD/otmux/internal/version.Version=$Version -X github.com/vamsikartik01/osmite-RnD/otmux/internal/version.Release=true" `
         -o "build/$name/otmux$ext" ./cmd/otmux
     if ($LASTEXITCODE -ne 0) { throw "build failed for $t" }
     Copy-Item README.md, ../LICENSE "build/$name/"

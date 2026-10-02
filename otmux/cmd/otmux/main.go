@@ -100,7 +100,11 @@ func run(args []string) error {
 	case "daemon":
 		return runDaemon()
 	case "version", "--version", "-v":
-		fmt.Println("otmux", version.Version)
+		if version.Release == "true" {
+			fmt.Println("otmux", version.Version)
+		} else {
+			fmt.Println("otmux", version.Version, "(built from source)")
+		}
 		return nil
 	case "help", "-h", "--help":
 		fmt.Printf(usage, keys.Label(keys.Default(prefix()).Prefix))

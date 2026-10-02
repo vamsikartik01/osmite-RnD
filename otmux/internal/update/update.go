@@ -21,6 +21,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/vamsikartik01/osmite-RnD/otmux/internal/version"
 )
 
 // DefaultBaseURL is where releases are downloaded from. OTMUX_UPDATE_URL
@@ -131,10 +133,13 @@ func Executable() (string, error) {
 	return filepath.EvalSymlinks(exe)
 }
 
+// official reports whether this is a release build; tests replace it.
+var official = func() bool { return version.Release == "true" }
+
 // Managed reports whether the program at exe may update itself.
-func Managed(exe, version string) error {
-	if _, ok := parse(version); !ok {
-		return fmt.Errorf("%w: development build", ErrNotManaged)
+func Managed(exe, current string) error {
+	if _, ok := parse(current); !ok || !official() {
+		return fmt.Errorf("%w: built from source", ErrNotManaged)
 	}
 	lower := strings.ToLower(filepath.ToSlash(exe))
 	for _, marker := range []string{"/scoop/", "/winget/", "/program files", "/cellar/", "/homebrew/", "/usr/bin/", "/usr/local/bin/", "/nix/store/", "/snap/"} {

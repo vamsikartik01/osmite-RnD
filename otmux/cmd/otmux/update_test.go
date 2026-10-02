@@ -30,7 +30,9 @@ func TestTUIUpdate(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		bin += ".exe"
 	}
-	if out, err := exec.Command("go", "build", "-o", bin, ".").CombinedOutput(); err != nil {
+	// Built like a release (only release builds update themselves).
+	ldflags := "-X github.com/vamsikartik01/osmite-RnD/otmux/internal/version.Release=true"
+	if out, err := exec.Command("go", "build", "-ldflags", ldflags, "-o", bin, ".").CombinedOutput(); err != nil {
 		t.Fatalf("build: %v\n%s", err, out)
 	}
 	payload, err := os.ReadFile(bin)
