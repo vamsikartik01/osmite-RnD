@@ -23,6 +23,7 @@ import (
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/keys"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/platform"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/protocol"
+	"github.com/vamsikartik01/osmite-RnD/otmux/internal/vtx"
 )
 
 // frameInterval caps redraws at ~120fps; output arriving faster is coalesced.
@@ -227,13 +228,13 @@ func (c *Client) applyState(st protocol.State) {
 	}
 	for id, m := range c.mirrors {
 		if !visible[id] {
-			_ = m.emu.Close()
+			vtx.Stop(m.emu)
 			delete(c.mirrors, id)
 		}
 	}
 	for id, h := range c.history {
 		if !visible[id] {
-			_ = h.emu.Close()
+			vtx.Stop(h.emu)
 			delete(c.history, id)
 		}
 	}
@@ -264,7 +265,7 @@ func newMirror(cols, rows int, data string) *mirror {
 // Called with c.mu held.
 func (c *Client) applyHistory(h protocol.History) {
 	if old := c.history[h.Pane]; old != nil {
-		_ = old.emu.Close()
+		vtx.Stop(old.emu)
 		delete(c.history, h.Pane)
 	}
 	if h.Offset > 0 {
@@ -276,10 +277,10 @@ func (c *Client) applyHistory(h protocol.History) {
 // applySnapshot replaces a pane's mirror. Called with c.mu held.
 func (c *Client) applySnapshot(s protocol.Snapshot) {
 	if old := c.mirrors[s.Pane]; old != nil {
-		_ = old.emu.Close()
+		vtx.Stop(old.emu)
 	}
 	if h := c.history[s.Pane]; h != nil { // a fresh view replaces history
-		_ = h.emu.Close()
+		vtx.Stop(h.emu)
 		delete(c.history, s.Pane)
 	}
 	m := newMirror(s.Cols, s.Rows, s.Data)
@@ -657,7 +658,7 @@ func (c *Client) leaveHistory(pane uint32) {
 	c.mu.Lock()
 	h := c.history[pane]
 	if h != nil {
-		_ = h.emu.Close()
+		vtx.Stop(h.emu)
 		delete(c.history, pane)
 	}
 	c.mu.Unlock()

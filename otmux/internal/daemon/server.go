@@ -21,6 +21,7 @@ import (
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/layout"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/platform"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/protocol"
+	"github.com/vamsikartik01/osmite-RnD/otmux/internal/vtx"
 )
 
 // ErrAlreadyRunning is returned by Run when another daemon owns the socket.
@@ -355,7 +356,7 @@ func (s *Server) join(c *client, ws *Workspace) {
 func killPane(p *Pane) {
 	p.exited = true
 	_ = p.pty.Kill()
-	_ = p.emu.Close()
+	vtx.Stop(p.emu)
 }
 
 func (s *Server) killWorkspace(ws *Workspace) {
@@ -818,7 +819,7 @@ func (s *Server) paneExited(p *Pane) {
 		return
 	}
 	p.exited = true
-	_ = p.emu.Close()
+	vtx.Stop(p.emu)
 
 	ws, t := p.ws, p.tab
 	t.tree.Remove(p.id)
