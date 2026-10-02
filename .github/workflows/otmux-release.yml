@@ -65,6 +65,12 @@ jobs:
           irm https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/otmux/install.ps1 | iex
           \`\`\`
 
+          **Linux and macOS**, in a terminal:
+
+          \`\`\`sh
+          curl -fsSL https://raw.githubusercontent.com/$GITHUB_REPOSITORY/main/otmux/install.sh | sh
+          \`\`\`
+
           Or download the file for your platform below; \`checksums.txt\` has their SHA-256 sums.
           On macOS and Linux, \`chmod +x\` the file and put it on your PATH as \`otmux\`.
           EOF

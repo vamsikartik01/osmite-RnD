@@ -24,6 +24,13 @@ otmux to your PATH):
 irm https://raw.githubusercontent.com/vamsikartik01/osmite-RnD/main/otmux/install.ps1 | iex
 ```
 
+**Linux and macOS**, one line in a terminal (installs to `~/.local/bin`, no
+sudo):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vamsikartik01/osmite-RnD/main/otmux/install.sh | sh
+```
+
 Or download the program directly. These links always give the newest version:
 
 | Platform | Download |
@@ -324,7 +331,8 @@ docs/                architecture, ADRs, roadmap
 Push a tag like `otmux/v1.0.1` (after bumping `internal/version`). The
 [release workflow](../.github/workflows/otmux-release.yml) tests, builds every
 platform, publishes the version's release, and updates the rolling
-`otmux/latest` release that the download links and `install.ps1` use.
+`otmux/latest` release that the download links, `install.ps1` and
+`install.sh` use.
 `./release.ps1` builds the same files locally into `dist/`, to try a release
 build first.
 

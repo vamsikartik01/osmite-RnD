@@ -13,7 +13,7 @@ and release tags.
 
 | Project | What it is | Status |
 |---|---|---|
-| [`otmux/`](otmux/) | A cross-platform terminal workspace (multiplexer) in Go: persistent tabs and panes, tmux-style keys plus mouse, built for remote control. Windows first, then Linux and macOS. | 1.0.0 |
+| [`otmux/`](otmux/) | A cross-platform terminal workspace (multiplexer) in Go: persistent tabs and panes, tmux-style keys plus mouse, built for remote control. Windows, Linux and macOS. | 1.1.3 |
 
 ## Download otmux
 
@@ -22,6 +22,13 @@ adds `otmux` to your PATH):
 
 ```powershell
 irm https://raw.githubusercontent.com/vamsikartik01/osmite-RnD/main/otmux/install.ps1 | iex
+```
+
+**Linux and macOS**, one line in a terminal (installs to `~/.local/bin`, no
+sudo):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/vamsikartik01/osmite-RnD/main/otmux/install.sh | sh
 ```
 
 Or download the program directly; these links always give the newest version:

@@ -38,6 +38,10 @@ type Options struct {
 	Rows int
 }
 
+// prepareCmd adjusts cmd before it starts on the PTY. It does nothing by
+// default; on Unix it makes the PTY the shell's controlling terminal.
+var prepareCmd = func(*exec.Cmd) {}
+
 // Start launches opts.Argv on a new pseudo-terminal.
 func Start(opts Options) (PTY, error) {
 	if len(opts.Argv) == 0 {
@@ -59,6 +63,7 @@ func Start(opts Options) (PTY, error) {
 		_ = p.Close()
 		return nil, err
 	}
+	prepareCmd(cmd)
 	if err := p.Start(cmd); err != nil {
 		_ = p.Close()
 		_, _ = r.Close(), w.Close()

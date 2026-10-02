@@ -7,6 +7,21 @@ All notable changes to otmux are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-10-02
+
+### Added
+
+- **Linux and macOS installer**, one line in a terminal:
+  `curl -fsSL https://raw.githubusercontent.com/vamsikartik01/osmite-RnD/main/otmux/install.sh | sh`.
+  It checks the download against the release's checksums and installs to
+  `~/.local/bin`, no sudo needed.
+
+### Fixed
+
+- On Linux and macOS, Ctrl+C now stops the running command and Ctrl+Z / `fg`
+  work: shells in panes run with the pane as their terminal. Before, panes
+  printed "no job control in this shell" and ignored Ctrl+C.
+
 ## [1.1.2] - 2026-10-02
 
 ### Fixed
@@ -79,7 +94,8 @@ published from the same code.
 - **Install**: a one-line PowerShell installer and fixed download links to
   the newest version.
 
-[Unreleased]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.2...HEAD
+[Unreleased]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.3...HEAD
+[1.1.3]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.2...otmux/v1.1.3
 [1.1.2]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.1...otmux/v1.1.2
 [1.1.1]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.0...otmux/v1.1.1
 [1.1.0]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.0.0...otmux/v1.1.0

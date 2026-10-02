@@ -3,7 +3,7 @@ package version
 
 // Version is the otmux release. Release builds also stamp it with
 // -ldflags "-X .../version.Version=..." from the git tag (otmux/vX.Y.Z).
-var Version = "1.1.2"
+var Version = "1.1.3"
 
 // Release is "true" in official release builds (set by release.ps1), and
 // empty when built from source with plain `go build`. Only release builds
