@@ -7,6 +7,8 @@ All notable changes to otmux are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-10-02
+
 ### Added
 
 - `otmux restart` stops the background service and every shell, then opens
@@ -121,7 +123,8 @@ published from the same code.
 - **Install**: a one-line PowerShell installer and fixed download links to
   the newest version.
 
-[Unreleased]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.4...HEAD
+[Unreleased]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.2.0...HEAD
+[1.2.0]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.4...otmux/v1.2.0
 [1.1.4]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.3...otmux/v1.1.4
 [1.1.3]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.2...otmux/v1.1.3
 [1.1.2]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.1...otmux/v1.1.2
