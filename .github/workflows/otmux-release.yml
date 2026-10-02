@@ -1,0 +1,83 @@
+# Publishes otmux when a version tag like otmux/v1.0.0 is pushed:
+#
+#   1. a release for that version, with archives and bare binaries;
+#   2. the rolling "otmux (latest)" release (tag otmux/latest), whose files
+#      always have the same names, so these links never change:
+#        .../releases/download/otmux/latest/otmux-windows-amd64.exe
+#
+# Package-manager publishing (winget, scoop, Homebrew) is on the roadmap.
+name: otmux release
+
+on:
+  push:
+    tags: ['otmux/v*'] # not otmux/latest, which this workflow moves itself
+
+permissions:
+  contents: write
+
+concurrency:
+  group: otmux-release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    working-directory: otmux
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: otmux/go.mod
+          cache-dependency-path: otmux/go.sum
+      - run: go test -count=1 ./...
+
+      - name: build
+        run: |
+          version="${GITHUB_REF_NAME#otmux/v}"
+          mkdir -p dist build
+          for target in windows/amd64 windows/arm64 linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            os=${target%/*}; arch=${target#*/}
+            ext=""; [ "$os" = windows ] && ext=".exe"
+            name="otmux_${version}_${os}_${arch}"
+            mkdir -p "build/$name"
+            GOOS=$os GOARCH=$arch CGO_ENABLED=0 go build -trimpath \
+              -ldflags "-s -w -X github.com/vamsikartik01/osmite-RnD/otmux/internal/version.Version=$version" \
+              -o "build/$name/otmux$ext" ./cmd/otmux
+            cp README.md ../LICENSE "build/$name/"
+            # Bare binary under a fixed name, for direct downloads.
+            cp "build/$name/otmux$ext" "dist/otmux-$os-$arch$ext"
+            if [ "$os" = windows ]; then
+              (cd build && zip -qr "../dist/$name.zip" "$name")
+            else
+              tar -C build -czf "dist/$name.tar.gz" "$name"
+            fi
+          done
+          (cd dist && sha256sum * > checksums.txt)
+          ls -l dist
+
+      - name: publish the version release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#otmux/v}"
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "otmux $version" --generate-notes --latest
+
+      - name: update the rolling otmux/latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#otmux/v}"
+          git tag -f otmux/latest "$GITHUB_SHA"
+          git push -f origin otmux/latest
+          notes="Always the newest otmux; currently **$version** ([release notes](https://github.com/$GITHUB_REPOSITORY/releases/tag/$GITHUB_REF_NAME)). The file names here never change, so links to them always download the latest version."
+          if gh release view otmux/latest >/dev/null 2>&1; then
+            gh release edit otmux/latest --title "otmux (latest: $version)" --notes "$notes" --latest=false
+            gh release upload otmux/latest dist/otmux-* dist/checksums.txt --clobber
+          else
+            gh release create otmux/latest dist/otmux-* dist/checksums.txt \
+              --title "otmux (latest: $version)" --notes "$notes" --latest=false
+          fi

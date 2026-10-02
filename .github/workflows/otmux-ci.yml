@@ -1,0 +1,58 @@
+name: otmux CI
+
+on:
+  push:
+    branches: [main]
+    paths: ['otmux/**', '.github/workflows/otmux-*.yml']
+  pull_request:
+    paths: ['otmux/**', '.github/workflows/otmux-*.yml']
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: otmux
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: otmux/go.mod
+          cache-dependency-path: otmux/go.sum
+      - name: gofmt
+        if: runner.os == 'Linux'
+        run: test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - run: go vet ./...
+      - name: test
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            go test -count=1 ./...
+          else
+            go test -count=1 -race ./...
+          fi
+
+  cross-build:
+    name: cross-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: otmux/go.mod
+          cache-dependency-path: otmux/go.sum
+      - name: build every release target
+        run: |
+          for target in windows/amd64 windows/arm64 linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+            echo "building $target"
+            GOOS=${target%/*} GOARCH=${target#*/} CGO_ENABLED=0 go build -o /dev/null ./cmd/otmux
+          done
