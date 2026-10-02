@@ -11,7 +11,7 @@ require (
 	github.com/charmbracelet/x/xpty v0.1.4
 	github.com/coder/websocket v1.8.15
 	github.com/mattn/go-runewidth v0.0.30
-	golang.org/x/sys v0.47.0
+	golang.org/x/sys v0.48.0
 )
 
 require (
