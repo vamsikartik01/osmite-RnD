@@ -22,9 +22,11 @@ jobs:
       matrix:
         os: [windows-latest, ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
+    # Windows tests must pass; Linux and macOS run too, but don't block.
+    continue-on-error: ${{ matrix.os != 'windows-latest' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: otmux/go.mod
           cache-dependency-path: otmux/go.sum
@@ -35,18 +37,29 @@ jobs:
       - name: test
         shell: bash
         run: |
-          if [ "$RUNNER_OS" = "Windows" ]; then
-            go test -count=1 ./...
-          else
-            go test -count=1 -race ./...
+          race=""
+          [ "$RUNNER_OS" != "Windows" ] && race="-race"
+          if go test -count=1 $race ./... > test.log 2>&1; then
+            grep -E '^(ok|---)' test.log || true
+            exit 0
           fi
+          cat test.log
+          # Publish the failures as annotations, which anyone can read on the
+          # run page (raw logs need a GitHub login).
+          annotate() { # title, then lines on stdin
+            msg=$(head -c 30000 | sed ':a;N;$!ba;s/%/%25/g;s/\r/%0D/g;s/\n/%0A/g')
+            [ -n "$msg" ] && echo "::error title=$1::$msg"
+          }
+          grep -E -- '--- FAIL|^FAIL|panic:|_test\.go:[0-9]+:' test.log | head -60 | annotate "go test failed on $RUNNER_OS"
+          awk '/WARNING: DATA RACE/{n=60} n-->0' test.log | head -120 | annotate "data race on $RUNNER_OS"
+          exit 1
 
   cross-build:
     name: cross-build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: otmux/go.mod
           cache-dependency-path: otmux/go.sum

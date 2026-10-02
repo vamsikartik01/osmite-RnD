@@ -2,14 +2,15 @@
 # for every platform, an archive and a bare binary with a fixed name, plus
 # checksums.txt, all in dist/.
 #
-#   ./release.ps1                 # version from internal/version
+#   ./release.ps1                 # version from internal/version, every platform
 #   ./release.ps1 -Version 1.0.1
+#   ./release.ps1 -Os windows     # only some platforms (comma-separated)
 #
 # Official releases are built by .github/workflows/otmux-release.yml when a
 # tag like otmux/v1.0.0 is pushed; use this to try a release build first, or
 # as a fallback.
 
-param([string]$Version = "")
+param([string]$Version = "", [string]$Os = "windows,linux,darwin")
 
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
@@ -26,7 +27,9 @@ if ($LASTEXITCODE -ne 0) { throw "tests failed" }
 Remove-Item -Recurse -Force dist, build -ErrorAction SilentlyContinue
 New-Item -ItemType Directory dist, build | Out-Null
 
-$targets = "windows/amd64", "windows/arm64", "linux/amd64", "linux/arm64", "darwin/amd64", "darwin/arm64"
+$wanted = $Os -split "," | ForEach-Object { $_.Trim() }
+$targets = "windows/amd64", "windows/arm64", "linux/amd64", "linux/arm64", "darwin/amd64", "darwin/arm64" |
+    Where-Object { $wanted -contains ($_ -split "/")[0] }
 $env:CGO_ENABLED = "0"
 foreach ($t in $targets) {
     $os, $arch = $t -split "/"
@@ -58,4 +61,4 @@ Get-ChildItem dist | Where-Object Name -ne "checksums.txt" | Sort-Object Name | 
 
 Remove-Item -Recurse -Force build
 Write-Host "Done:"
-Get-ChildItem dist | Format-Table Name, Length -AutoSize
+Get-ChildItem dist | ForEach-Object { "  {0,-34} {1,10:N0} bytes" -f $_.Name, $_.Length }
