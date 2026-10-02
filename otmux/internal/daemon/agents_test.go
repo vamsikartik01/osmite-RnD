@@ -67,6 +67,7 @@ func TestAgentPinning(t *testing.T) {
 
 	sock := filepath.Join(dir, "a.sock")
 	t.Setenv("OTMUX_SOCKET", sock)
+	t.Setenv("OTMUX_CONFIG", filepath.Join(t.TempDir(), "config.json")) // keeps the real remote.json out
 	if runtime.GOOS == "windows" {
 		t.Setenv("OTMUX_SHELL", "cmd.exe")
 	} else {

@@ -271,6 +271,7 @@ new version too (that closes running shells, after asking).
 | `OTMUX_NO_UPDATE` | set to anything to turn automatic updates off |
 | `OTMUX_SHELL` | shell for new panes (default: `pwsh`, then `powershell`, then `cmd` on Windows; `$SHELL` elsewhere) |
 | `OTMUX_SOCKET` | daemon socket path, for running an isolated daemon while developing |
+| `OTMUX_REMOTE_URL` | remote server to link with (default `https://otmux.osmite.site`); plain `http://` only to localhost |
 
 The daemon log is next to the socket:
 `%LOCALAPPDATA%\otmux\otmux.log` on Windows, and

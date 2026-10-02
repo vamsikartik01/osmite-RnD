@@ -486,6 +486,14 @@ func (c *Client) drawRight(s uv.Screen, x, y int, showZoom bool) {
 		groups = append(groups, group{4, []seg{{text: " ↑ " + c.updateBadge + " ", style: uv.Style{Fg: t.OnAccent, Bg: t.Accent},
 			act: &keys.Action{Name: keys.ActionSettings, Arg: "updates"}}, gap}})
 	}
+	if badge, attn := c.remoteBadge(); badge != "" {
+		st := uv.Style{Fg: t.OnAccent, Bg: t.Accent}
+		if attn {
+			st = uv.Style{Fg: AttnText, Bg: t.Attn}
+		}
+		groups = append(groups, group{4, []seg{{text: " " + badge + " ", style: st,
+			act: &keys.Action{Name: keys.ActionSettings, Arg: "remote"}}, gap}})
+	}
 	hints := []seg{{text: prefix, style: key}}
 	for _, h := range [][2]string{{"v", "split"}, {"c", "tab"}, {"space", "commands"}} {
 		hints = append(hints, seg{text: "  " + keys.Label(h[0]), style: key}, seg{text: " " + h[1], style: label})

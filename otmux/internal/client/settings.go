@@ -13,6 +13,7 @@ import (
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/keys"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/platform"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/protocol"
+	"github.com/vamsikartik01/osmite-RnD/otmux/internal/remote"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/version"
 )
 
@@ -22,11 +23,12 @@ const (
 	secAppearance
 	secKeys
 	secUpdates
+	secRemote
 	secAbout
 	numSections
 )
 
-var sectionNames = [numSections]string{"Workspaces", "Appearance", "Keys", "Updates", "About"}
+var sectionNames = [numSections]string{"Workspaces", "Appearance", "Keys", "Updates", "Remote", "About"}
 
 var layoutLabels = map[string]string{
 	config.LayoutSidebar: "Sidebar",
@@ -82,6 +84,7 @@ func (c *Client) openSettings() {
 	c.mu.Lock()
 	c.overlay = nil
 	c.settings = &settings{inMenu: true}
+	c.loadRemote()
 	c.mu.Unlock()
 }
 
@@ -163,6 +166,8 @@ func (c *Client) settingsRows(sec int) []settingsRow {
 			go c.checkUpdates(true)
 			return keys.Action{}, false
 		}})
+	case secRemote:
+		rows = c.remoteRows()
 	}
 	return rows
 }
@@ -190,11 +195,14 @@ func (c *Client) settingsInfo(sec int) []string {
 		}
 	case secUpdates:
 		return c.updateInfoLines()
+	case secRemote:
+		return c.remoteInfo()
 	case secAbout:
 		return []string{
 			"otmux " + version.Version,
 			"",
 			"Settings  " + config.Path(),
+			"Remote    " + remote.Path(),
 			"Socket    " + platform.SocketPath(),
 			"Log       " + platform.LogPath(),
 		}

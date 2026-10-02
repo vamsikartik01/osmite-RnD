@@ -23,6 +23,7 @@ import (
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/keys"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/platform"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/protocol"
+	"github.com/vamsikartik01/osmite-RnD/otmux/internal/remote"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/update"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/vtx"
 )
@@ -69,6 +70,12 @@ type Client struct {
 	sel          *selection        // mouse text selection
 	hits         []hit             // clickable status bar regions, set by render
 	byeReason    string
+
+	// Remote mode (Settings › Remote): the account from remote.json and a
+	// link in progress, if any.
+	remoteAcct remote.Account
+	remoteLink *remoteLink
+	remoteNote string // outcome of the last link or disconnect
 
 	dirty chan struct{}
 	done  chan struct{}
@@ -166,6 +173,9 @@ func Attach(opts Options) (string, error) {
 	}
 
 	c.startUpdates(w.Daemon)
+	c.mu.Lock()
+	c.loadRemote()
+	c.mu.Unlock()
 	go c.readLoop()
 	go c.renderLoop()
 	reason := c.eventLoop()
@@ -251,6 +261,9 @@ func (c *Client) applyState(st protocol.State) {
 	}
 	if c.drag != nil && st.Zoomed {
 		c.drag = nil
+	}
+	if remoteState(st.Remote) != remoteState(c.state.Remote) {
+		c.loadRemote() // e.g. a revoke made the daemon forget the token
 	}
 	c.state = st
 }
@@ -441,14 +454,17 @@ func (c *Client) run(act keys.Action, k uv.KeyPressEvent) (string, bool) {
 		c.openOverlay(c.workspaceOverlay())
 	case keys.ActionSettings:
 		c.openSettings()
-		if act.Arg == "updates" {
-			c.mu.Lock()
-			if c.settings != nil {
+		c.mu.Lock()
+		if c.settings != nil {
+			switch act.Arg {
+			case "updates":
 				c.settings.section, c.settings.inMenu = secUpdates, false
 				c.settings.sel[secUpdates] = 1 // "Update now"
+			case "remote":
+				c.settings.section, c.settings.inMenu = secRemote, false
 			}
-			c.mu.Unlock()
 		}
+		c.mu.Unlock()
 	case keys.ActionToggleSidebar:
 		c.mu.Lock()
 		if c.cfg.LayoutName() == config.LayoutSidebar {

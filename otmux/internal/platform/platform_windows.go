@@ -41,3 +41,15 @@ func Detach(cmd *exec.Cmd) {
 		HideWindow:    true,
 	}
 }
+
+func canOpenBrowser() bool { return true }
+
+// OpenURL opens url in the default browser, in the background.
+func OpenURL(url string) error {
+	cmd := exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
+	if err := cmd.Start(); err != nil {
+		return err
+	}
+	go func() { _ = cmd.Wait() }()
+	return nil
+}

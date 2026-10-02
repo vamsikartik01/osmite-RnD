@@ -22,6 +22,7 @@ import (
 func TestEndToEnd(t *testing.T) {
 	sock := filepath.Join(shortTempDir(t), "t.sock")
 	t.Setenv("OTMUX_SOCKET", sock)
+	t.Setenv("OTMUX_CONFIG", filepath.Join(t.TempDir(), "config.json")) // keeps the real remote.json out
 	if runtime.GOOS == "windows" {
 		t.Setenv("OTMUX_SHELL", "cmd.exe")
 	} else {

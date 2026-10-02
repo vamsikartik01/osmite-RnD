@@ -176,6 +176,11 @@ const (
 	ActionPrevPinned = "prev-pinned"
 
 	ActionKillServer = "kill-server"
+
+	// ActionRemoteReload tells the daemon remote.json changed (remote mode
+	// turned on or off, account linked or disconnected). Daemons from before
+	// remote mode ignore it.
+	ActionRemoteReload = "remote-reload"
 )
 
 // TabInfo describes one tab in a State message.
@@ -247,6 +252,25 @@ type State struct {
 	ActivePane uint32          `json:"active_pane"`
 	Pinned     []PinnedTab     `json:"pinned,omitempty"`
 	Zoomed     bool            `json:"zoomed,omitempty"`
+	// Remote is the daemon's remote mode status. Daemons from before remote
+	// mode leave it out.
+	Remote *RemoteStatus `json:"remote,omitempty"`
+}
+
+// Remote mode states.
+const (
+	RemoteOff        = "off"
+	RemoteConnecting = "connecting"
+	RemoteOnline     = "online"
+	RemoteRetrying   = "retrying" // lost the server; reconnecting with backoff
+	RemoteStopped    = "stopped"  // stopped by the server (revoked, replaced); see Error
+)
+
+// RemoteStatus says whether the daemon is reachable from the browser.
+type RemoteStatus struct {
+	State    string `json:"state"`
+	Sessions int    `json:"sessions,omitempty"` // browsers attached right now
+	Error    string `json:"error,omitempty"`
 }
 
 // Snapshot replaces the client's copy of a pane's screen. Data is a stream of

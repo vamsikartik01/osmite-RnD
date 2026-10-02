@@ -7,6 +7,17 @@ All notable changes to otmux are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- Remote mode: open this machine's workspaces from a browser, on desktop or
+  phone, at otmux.osmite.site. Settings › Remote › Connect account links the
+  machine to your account (approve a code in the browser; works over SSH
+  too), and the Remote mode toggle keeps the daemon connected. The machine
+  connects out, so there are no ports to open. The status bar shows when a
+  browser is attached. Revoking the device in the portal turns remote mode
+  off. The link lives in `remote.json` next to the settings, readable only by
+  you.
+
 ## [1.2.0] - 2026-10-02
 
 ### Added

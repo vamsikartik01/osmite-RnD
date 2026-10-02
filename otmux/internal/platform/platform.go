@@ -40,3 +40,12 @@ func Shell() []string {
 	}
 	return defaultShell()
 }
+
+// CanOpenBrowser reports whether OpenURL is likely to reach the user: not
+// over SSH, and on Linux only with a graphical session.
+func CanOpenBrowser() bool {
+	if os.Getenv("SSH_CONNECTION") != "" || os.Getenv("SSH_TTY") != "" {
+		return false
+	}
+	return canOpenBrowser()
+}

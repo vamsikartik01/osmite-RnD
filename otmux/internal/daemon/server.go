@@ -21,6 +21,7 @@ import (
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/layout"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/platform"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/protocol"
+	"github.com/vamsikartik01/osmite-RnD/otmux/internal/remote"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/version"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/vtx"
 )
@@ -43,6 +44,11 @@ type Server struct {
 	nextID     uint32
 	pinSeq     uint64
 	everUsed   bool
+
+	// remote holds the connection to the remote server while remote mode
+	// is on; remoteStatus is its last status, for State.
+	remote       *remote.Agent
+	remoteStatus protocol.RemoteStatus
 
 	shutdownOnce sync.Once
 	done         chan struct{}
@@ -67,6 +73,9 @@ func Run() error {
 		return fmt.Errorf("listen %s: %w", path, err)
 	}
 	s := &Server{ln: ln, workspaces: map[string]*Workspace{}, done: make(chan struct{})}
+	s.remote = remote.NewAgent(func(nc net.Conn) { s.serve(protocol.NewConn(nc), true) }, s.setRemoteStatus)
+	s.remoteStatus = s.remote.Status()
+	go s.remote.Reload()
 	go s.watchAgents()
 	log.Printf("otmux daemon listening on %s (pid %d)", path, os.Getpid())
 
@@ -76,10 +85,11 @@ func Run() error {
 			if err != nil {
 				return
 			}
-			go s.serve(protocol.NewConn(nc))
+			go s.serve(protocol.NewConn(nc), false)
 		}
 	}()
 	<-s.done
+	s.remote.Stop()
 	// Give clients a moment to receive their Bye before the process exits.
 	flushed := make(chan struct{})
 	go func() { s.writers.Wait(); close(flushed) }()
@@ -165,9 +175,11 @@ func (c *client) close() {
 	close(c.out)
 }
 
-func (s *Server) serve(conn *protocol.Conn) {
+// serve runs one client connection. Remote ones (browsers, through the
+// remote server) may only attach: no listing or one-shot commands.
+func (s *Server) serve(conn *protocol.Conn, remote bool) {
 	first, err := conn.Read()
-	if err != nil {
+	if err != nil || (remote && first.Type != protocol.TypeHello) {
 		conn.Close()
 		return
 	}
@@ -630,6 +642,9 @@ func (s *Server) command(c *client, cmd protocol.Command) {
 	case protocol.ActionKillServer:
 		s.killServer()
 		return
+	case protocol.ActionRemoteReload:
+		go s.remote.Reload() // it reports back through setRemoteStatus, which takes s.mu
+		return
 	default:
 		return
 	}
@@ -856,7 +871,8 @@ func (s *Server) paneExited(p *Pane) {
 // --- broadcasting ------------------------------------------------------------
 
 func (s *Server) state(ws *Workspace) protocol.State {
-	st := protocol.State{Workspace: ws.name, Workspaces: s.workspaceInfos(), Active: ws.active, Pinned: s.pinnedList()}
+	rs := s.remoteStatus
+	st := protocol.State{Workspace: ws.name, Workspaces: s.workspaceInfos(), Active: ws.active, Pinned: s.pinnedList(), Remote: &rs}
 	for _, t := range ws.tabs {
 		info := protocol.TabInfo{ID: t.id, Name: t.name, Panes: len(t.panes), Pinned: t.pinned()}
 		if info.Pinned {
@@ -882,6 +898,14 @@ func (s *Server) state(ws *Workspace) protocol.State {
 	st.ActivePane = t.active
 	st.Zoomed = t.zoomed
 	return st
+}
+
+// setRemoteStatus shows a remote mode change to every client.
+func (s *Server) setRemoteStatus(st protocol.RemoteStatus) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.remoteStatus = st
+	s.broadcastStates()
 }
 
 func (s *Server) broadcastState(ws *Workspace) {

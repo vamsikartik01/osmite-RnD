@@ -56,6 +56,7 @@ Environment:
   OTMUX_PREFIX   prefix key, e.g. ctrl+a (default ctrl+b)
   OTMUX_SHELL    shell for new panes
   OTMUX_SOCKET   daemon socket path (run an isolated daemon)
+  OTMUX_REMOTE_URL  remote server to link with (default https://otmux.osmite.site)
 `
 
 func main() {
