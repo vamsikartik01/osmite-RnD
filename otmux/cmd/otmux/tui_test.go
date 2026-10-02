@@ -178,7 +178,9 @@ func TestTUI(t *testing.T) {
 	term.typ("\x1b")
 	term.waitFor(t, "settings closed", func(s string) bool { return !strings.Contains(s, "Appearance") })
 
-	// A saved workspace opens from the sidebar, in its folder.
+	// A saved workspace opens from the sidebar, in its folder. Wait for its
+	// row: "settings closed" can match while the sidebar is still redrawing.
+	term.waitFor(t, "sidebar redrawn", func(s string) bool { return strings.Contains(s, "   lab ") })
 	term.click(t, "   lab ")
 	term.waitFor(t, "saved workspace", func(s string) bool { return currentWS(s, "lab") })
 
