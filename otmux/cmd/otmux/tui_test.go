@@ -86,6 +86,14 @@ func TestTUI(t *testing.T) {
 	term.typ("\x02") // ctrl+b
 	term.waitFor(t, "prefix hints", func(s string) bool { return strings.Contains(s, "v split │") && strings.Contains(s, "h split ─") })
 
+	// The cursor stays at the shell prompt even though the bar at the bottom
+	// was drawn last. (ultraviolet used to leave it after the last drawn
+	// cell until the next frame, so it showed up in the wrong place.)
+	time.Sleep(300 * time.Millisecond)
+	if x, y, line := term.cursorLine(); y >= 23 || x < len([]rune(strings.TrimRight(line, " "))) {
+		t.Fatalf("cursor at x=%d y=%d, want at the end of the prompt line %q", x, y, line)
+	}
+
 	// v splits side by side: a vertical divider appears, old output stays left.
 	term.typ("v")
 	term.waitFor(t, "split", func(s string) bool {
@@ -282,6 +290,18 @@ func startTerm(t *testing.T, bin string, env []string, cols, rows int) *term {
 }
 
 func (tm *term) typ(s string) { _, _ = tm.p.Write([]byte(s)) }
+
+// cursorLine returns the cursor position and the text of its line.
+func (tm *term) cursorLine() (x, y int, line string) {
+	tm.mu.Lock()
+	defer tm.mu.Unlock()
+	pos := tm.emu.CursorPosition()
+	lines := strings.Split(tm.emu.String(), "\n")
+	if pos.Y < len(lines) {
+		line = lines[pos.Y]
+	}
+	return pos.X, pos.Y, line
+}
 
 func (tm *term) modeEnabled(m ansi.Mode) bool {
 	tm.mu.Lock()

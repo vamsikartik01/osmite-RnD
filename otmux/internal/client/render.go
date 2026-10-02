@@ -93,6 +93,14 @@ func (c *Client) render() {
 	}
 	scr.Render()
 	_ = scr.Flush()
+	if showCursor {
+		// ultraviolet's Flush queues the move to the cursor position inside
+		// its renderer without sending it, so the cursor would stay where
+		// the last cell was drawn until the next frame (e.g. one cell off
+		// after typing). A second pass with nothing new to draw sends it.
+		scr.Render()
+		_ = scr.Flush()
+	}
 }
 
 // paneTheme returns the theme to colour panes with, or nil to leave them in
