@@ -7,6 +7,14 @@ All notable changes to otmux are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.4] - 2026-10-02
+
+### Fixed
+
+- `install.sh` no longer looks stuck on "Downloading otmux": it shows a
+  progress bar, and when one of GitHub's download servers is unreachable it
+  moves on to another after a few seconds instead of waiting a minute.
+
 ## [1.1.3] - 2026-10-02
 
 ### Added
@@ -94,7 +102,8 @@ published from the same code.
 - **Install**: a one-line PowerShell installer and fixed download links to
   the newest version.
 
-[Unreleased]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.3...HEAD
+[Unreleased]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.4...HEAD
+[1.1.4]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.3...otmux/v1.1.4
 [1.1.3]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.2...otmux/v1.1.3
 [1.1.2]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.1...otmux/v1.1.2
 [1.1.1]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.1.0...otmux/v1.1.1

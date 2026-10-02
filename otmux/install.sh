@@ -37,20 +37,25 @@ asset="otmux-$os-$arch"
 tmp=$(mktemp -d 2>/dev/null || mktemp -d -t otmux-install)
 trap 'rm -rf "$tmp"' EXIT INT TERM
 
-fetch() { # name
+# GitHub serves release files from several addresses, and on some networks
+# one of them is unreachable. Without a connect timeout curl waits a minute
+# on it before trying the next; with one it moves on after a few seconds.
+fetch() { # name [progress]
 	if [ -n "${OTMUX_INSTALL_FROM:-}" ]; then
 		cp "$OTMUX_INSTALL_FROM/$1" "$tmp/$1"
 	elif command -v curl >/dev/null 2>&1; then
-		curl -fsSL -o "$tmp/$1" "$base/$1"
+		show="-sS"
+		[ -n "${2:-}" ] && [ -t 2 ] && show="--progress-bar"
+		curl -fL $show --connect-timeout 6 --retry 3 --retry-delay 1 -o "$tmp/$1" "$base/$1"
 	elif command -v wget >/dev/null 2>&1; then
-		wget -q -O "$tmp/$1" "$base/$1"
+		wget -q --timeout=6 --tries=3 -O "$tmp/$1" "$base/$1"
 	else
 		fail "needs curl or wget"
 	fi
 }
 
 echo "Downloading otmux ($os/$arch)..."
-fetch "$asset" || fail "download of $asset failed"
+fetch "$asset" progress || fail "download of $asset failed"
 fetch checksums.txt || fail "download of checksums.txt failed"
 
 # Verify the download. checksums.txt is written on Windows, so drop the CRs.
