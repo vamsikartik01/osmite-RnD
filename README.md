@@ -13,7 +13,7 @@ and release tags.
 
 | Project | What it is | Status |
 |---|---|---|
-| [`otmux/`](otmux/) | A cross-platform terminal workspace (multiplexer) in Go: persistent tabs and panes, tmux-style keys plus mouse, built for remote control. Windows, Linux and macOS. | 1.2.0 |
+| [`otmux/`](otmux/) | A cross-platform terminal workspace (multiplexer) in Go: persistent tabs and panes, tmux-style keys plus mouse, built for remote control. Windows, Linux and macOS. | 1.3.0 |
 
 ## Download otmux
 
