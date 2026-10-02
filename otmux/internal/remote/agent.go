@@ -273,7 +273,7 @@ func (g *Agent) connect(ctx context.Context, a Account) error {
 	defer m2.closeAll()
 	pctx, stopPing := context.WithCancel(ctx)
 	defer stopPing()
-	go keepAlive(pctx, c)
+	go keepAlive(pctx, c, pingInterval, pingTimeout) // read here: tests change them
 	err = m2.readLoop()
 	switch websocket.CloseStatus(err) {
 	case closeRevoked:
@@ -288,8 +288,8 @@ func (g *Agent) connect(ctx context.Context, a Account) error {
 
 // keepAlive pings the server and drops the connection when it stops
 // answering, so the read loop ends and the agent reconnects.
-func keepAlive(ctx context.Context, c *websocket.Conn) {
-	t := time.NewTicker(pingInterval)
+func keepAlive(ctx context.Context, c *websocket.Conn, interval, timeout time.Duration) {
+	t := time.NewTicker(interval)
 	defer t.Stop()
 	for {
 		select {
@@ -297,7 +297,7 @@ func keepAlive(ctx context.Context, c *websocket.Conn) {
 			return
 		case <-t.C:
 		}
-		pctx, cancel := context.WithTimeout(ctx, pingTimeout)
+		pctx, cancel := context.WithTimeout(ctx, timeout)
 		err := c.Ping(pctx)
 		cancel()
 		if err != nil && ctx.Err() == nil {
