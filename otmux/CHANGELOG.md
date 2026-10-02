@@ -7,8 +7,12 @@ All notable changes to otmux are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.3.3] - 2026-10-02
+
 ### Changed
 
+- Sidebar items are three-row blocks: a watched tab or workspace, its detail
+  line and the blank row under them highlight and click as one.
 - Opening a workspace in a second place (a browser on your phone, another
   terminal) no longer resizes it everywhere. The workspace keeps the size of
   the client that opened it first, then of whichever one you last typed in;
@@ -175,7 +179,8 @@ published from the same code.
 - **Install**: a one-line PowerShell installer and fixed download links to
   the newest version.
 
-[Unreleased]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.3.2...HEAD
+[Unreleased]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.3.3...HEAD
+[1.3.3]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.3.2...otmux/v1.3.3
 [1.3.2]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.3.1...otmux/v1.3.2
 [1.3.1]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.3.0...otmux/v1.3.1
 [1.3.0]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.2.0...otmux/v1.3.0

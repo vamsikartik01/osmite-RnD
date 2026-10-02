@@ -74,24 +74,25 @@ func (c *Client) daemonRows() int { return max(c.rows-c.oy(), 2) }
 
 // drawSidebar draws the sidebar on one alignment grid: the otmux mark on
 // the tab bar's row, section headings at column 1, items straight below them
-// with a blank row between, notes right-aligned, and the current item in a
-// highlighted box. A watched tab takes two rows: its name, then the agent in
-// it and its workspace. A line on its right edge separates the sidebar from
-// the panes.
+// as three-row blocks (two lines and a blank one, all clickable), notes
+// right-aligned, and the current item's whole block highlighted. A watched
+// tab's lines are its name, then the agent in it and its workspace. A line
+// on its right edge separates the sidebar from the panes.
 //
 //	 otmux                    │
 //	                          │
 //	 WATCH                    │
-//	 ⠹ claude-refactor working│
-//	   Claude · api           │
-//	                          │
+//	[⠹ claude-refac… working]│  current
+//	[  Claude · api          ]│
+//	[                        ]│
 //	 ● codex-tests    waiting │
 //	   Codex · web            │
+//	                          │
 //	                          │
 //	 WORKSPACES             + │
 //	[  api                 3 ]│  current
 //	[  ~/src/api             ]│
-//	                          │
+//	[                        ]│
 //	   web                 1  │
 //	                          │  no saved folder
 //	                          │
@@ -137,14 +138,15 @@ func (c *Client) drawSidebar(s uv.Screen, h int) {
 	}
 
 	// Watch list, capped at half the sidebar so workspaces stay visible.
-	// Each tab is two rows, with a blank row between tabs while they fit.
+	// Each tab is a block of three rows (the third blank) while they fit,
+	// else two.
 	y := 2
 	heading(y, "WATCH")
 	y++
 	watchEnd := max(y+(bottom-y)/2, y+3)
 	pinned := c.state.Pinned
 	gap := 1
-	if len(pinned)*3-1 > watchEnd-y {
+	if len(pinned)*3 > watchEnd-y {
 		gap = 0
 	}
 	var current uint32
@@ -188,13 +190,14 @@ func (c *Client) drawSidebar(s uv.Screen, h int) {
 		if end := w - 1; end-x > 1 {
 			put(s, x, y, runewidth.Truncate(p.Workspace, end-x, "…"), uv.Style{Fg: t.Faint, Bg: st.Bg})
 		}
+		if gap == 1 {
+			row(y+1, 3, uv.Style{Bg: st.Bg}, "", "", act) // the block's blank row
+		}
 		y += 1 + gap
 	}
 	if len(pinned) == 0 {
 		row(y, 1, faint, prefix+" m to watch a tab", "", nil)
 		y++
-	} else if gap == 1 {
-		y-- // the last tab's gap
 	}
 
 	// Workspaces, with + in the heading to add one: running ones, then saved
@@ -233,11 +236,11 @@ func (c *Client) drawSidebar(s uv.Screen, h int) {
 			rows = append(rows, wsRow{faint, p.Name, "", p.Path, keys.Action{Name: protocol.ActionNewWorkspace, Arg: p.Name, Dir: p.Path}})
 		}
 	}
-	// Two rows each (name, then folder) and a blank row between while they
-	// fit; then without the blank rows; then one row each.
+	// Three-row blocks (name, folder, blank) while they fit; then two rows
+	// each; then one.
 	lines, gap := 2, 1
 	switch room := bottom - 1 - y; {
-	case len(rows)*3-1 <= room:
+	case len(rows)*3 <= room:
 	case len(rows)*2 <= room:
 		gap = 0
 	default:
@@ -253,6 +256,9 @@ func (c *Client) drawSidebar(s uv.Screen, h int) {
 			if r.path != "" {
 				put(s, 3, y+1, clipLeft(shortPath(r.path), w-4), uv.Style{Fg: t.Faint, Bg: r.st.Bg})
 			}
+		}
+		if gap == 1 {
+			row(y+lines, 3, uv.Style{Bg: r.st.Bg}, "", "", &r.act) // the block's blank row
 		}
 		y += lines + gap
 	}
