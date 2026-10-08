@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -95,5 +96,25 @@ func TestSaveWhileFileIsOpen(t *testing.T) {
 	got, err := Load()
 	if err != nil || got.Theme != "calcite" {
 		t.Fatalf("after save while open: %+v %v", got, err)
+	}
+}
+
+func TestRemoteLaunchersRoundTrip(t *testing.T) {
+	t.Setenv("OTMUX_CONFIG", filepath.Join(t.TempDir(), "config.json"))
+	c := &Config{Theme: "dark", Remote: Remote{Launchers: map[string]string{"offspace-agent": "/home/me/.offspace/bin/launch-agent"}}}
+	if err := c.Save(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := Load()
+	if err != nil || got.Remote.Launchers["offspace-agent"] != "/home/me/.offspace/bin/launch-agent" {
+		t.Fatalf("%+v %v", got, err)
+	}
+	// No launchers: nothing written for remote.
+	if err := (&Config{Theme: "dark"}).Save(); err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(Path())
+	if strings.Contains(string(b), "remote") {
+		t.Fatalf("empty remote written: %s", b)
 	}
 }

@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"sort"
 
+	"github.com/vamsikartik01/osmite-RnD/otmux/internal/config"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/keys"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/platform"
 	"github.com/vamsikartik01/osmite-RnD/otmux/internal/protocol"
@@ -36,6 +38,33 @@ func (c *Client) loadRemote() {
 		c.remoteNote = "Couldn't read " + remote.Path() + ": " + err.Error()
 	}
 	c.remoteAcct = a
+	// Launchers are only ever set in the config file; read it fresh.
+	c.launchers = nil
+	if cfg, err := config.Load(); err == nil {
+		c.launchers = cfg.Remote.Launchers
+	}
+}
+
+// launcherLines lists the remote run launchers, read-only. Called with c.mu
+// held.
+func (c *Client) launcherLines() []string {
+	lines := []string{"", "Remote launchers (remote.launchers in " + shortPath(config.Path()) + ")"}
+	if len(c.launchers) == 0 {
+		return append(lines, "  none: the server can't start runs on this machine")
+	}
+	kinds := make([]string, 0, len(c.launchers))
+	for k := range c.launchers {
+		kinds = append(kinds, k)
+	}
+	sort.Strings(kinds)
+	w := 0
+	for _, k := range kinds {
+		w = max(w, len(k))
+	}
+	for _, k := range kinds {
+		lines = append(lines, fmt.Sprintf("  %-*s  %s", w, k, shortPath(c.launchers[k])))
+	}
+	return lines
 }
 
 // reloadDaemonRemote tells the daemon remote.json changed.
@@ -181,6 +210,9 @@ func (c *Client) remoteInfo() []string {
 		lines = append(lines, "Account   "+a.Email, "Server    "+hostOf(a.Server))
 		lines = append(lines, "Status    "+c.remoteStatusText())
 		lines = append(lines, "", "Anyone signed in to this account can use the shells on this machine.")
+	}
+	if a.Linked() {
+		lines = append(lines, c.launcherLines()...)
 	}
 	if c.remoteNote != "" {
 		lines = append(lines, "", c.remoteNote)

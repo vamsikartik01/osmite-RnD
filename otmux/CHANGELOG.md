@@ -7,6 +7,20 @@ All notable changes to otmux are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-10-09
+
+### Added
+
+- Remote runs. A linked remote server can ask this machine to run a job of
+  some kind in a workspace: otmux opens a tab there (creating the workspace if
+  needed) and starts the launcher you configured for that kind. The server
+  only names the kind; it never chooses the program, and its inputs reach the
+  launcher as `OTMUX_*` environment variables, never on a command line. When
+  the launcher exits, its tab stays open with the exit code until you close it
+  or the next run replaces it. See [Remote runs](README.md#remote-runs).
+- `otmux launcher` lists, sets and removes launchers (`remote.launchers` in
+  the settings file). Settings › Remote shows them.
+
 ## [1.3.3] - 2026-10-02
 
 ### Changed
@@ -179,7 +193,8 @@ published from the same code.
 - **Install**: a one-line PowerShell installer and fixed download links to
   the newest version.
 
-[Unreleased]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.3.3...HEAD
+[Unreleased]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.4.0...HEAD
+[1.4.0]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.3.3...otmux/v1.4.0
 [1.3.3]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.3.2...otmux/v1.3.3
 [1.3.2]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.3.1...otmux/v1.3.2
 [1.3.1]: https://github.com/vamsikartik01/osmite-RnD/compare/otmux/v1.3.0...otmux/v1.3.1

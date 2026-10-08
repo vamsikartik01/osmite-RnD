@@ -244,6 +244,8 @@ between the menu and the list, and `enter` to choose.
 - **Updates:** automatic updates on or off, *Update now*, the installed
   and latest versions, and what's new once an update is waiting for a
   restart. See [Updates](#updates).
+- **Remote:** link this machine to a remote server to open its workspaces
+  from a browser, and the [remote launchers](#remote-runs) it has (read-only).
 - **About:** the version, and where the settings, socket and log are.
 
 Settings are stored as JSON in `%AppData%\otmux\config.json` on Windows,
@@ -268,6 +270,54 @@ too (also after asking).
   `otmux update`.
 - Copies installed by a package manager, or in a folder you can't write to,
   never update themselves.
+
+## Remote runs
+
+A remote server linked in **Settings › Remote** can ask this machine to start
+a job: "run kind *X* in workspace *W*". otmux opens a new tab in that
+workspace (creating the workspace if it doesn't exist) and starts the
+**launcher** you configured for the kind. The server never chooses the
+program and nothing it sends ends up in a command line: it only names the
+kind, and its other inputs reach the launcher as environment variables.
+
+Configure launchers with `otmux launcher`:
+
+```
+otmux launcher set offspace-agent /home/me/.offspace/bin/launch-agent
+otmux launcher                 # list them
+otmux launcher rm offspace-agent
+```
+
+That writes `remote.launchers` in the settings file (`set` checks the path is
+an absolute path to an executable file):
+
+```json
+{
+  "remote": {
+    "launchers": {
+      "offspace-agent": "/home/me/.offspace/bin/launch-agent"
+    }
+  }
+}
+```
+
+A kind with no launcher fails the run (`no_launcher`), so a machine without
+launchers can't be asked to run anything. The launcher runs in your home
+folder with these variables set:
+
+| Variable | Value |
+|---|---|
+| `OTMUX_RUN_ID` | the run's id, from the server |
+| `OTMUX_WORKSPACE` | the workspace it runs in |
+| `OTMUX_KIND` | the kind |
+| other `OTMUX_*` | whatever the server sends for that kind, e.g. `OTMUX_PROMPT` (it can't set anything else, such as `PATH`) |
+
+One run at a time per workspace. When the launcher exits, its tab stays open
+with `[run finished, exit code N]` under its output, until you close it or the
+next run in that workspace replaces it. The server can stop a run, which ends
+the launcher and everything it started. For example, the OffSpace agent kit
+installs an `offspace-agent` launcher that starts a coding agent in the
+agent's repository with the prompt it was given.
 
 ## Environment
 

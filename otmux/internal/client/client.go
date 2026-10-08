@@ -78,6 +78,7 @@ type Client struct {
 	// Remote mode (Settings › Remote): the account from remote.json and a
 	// link in progress, if any.
 	remoteAcct remote.Account
+	launchers  map[string]string // config remote.launchers, read when settings open
 	remoteLink *remoteLink
 	remoteNote string // outcome of the last link or disconnect
 

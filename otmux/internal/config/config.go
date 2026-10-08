@@ -11,6 +11,8 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -42,9 +44,18 @@ type Config struct {
 	// AutoUpdate is nil for the default (on).
 	AutoUpdate *bool     `json:"auto_update,omitempty"`
 	Workspaces []Profile `json:"workspaces,omitempty"`
+	Remote     Remote    `json:"remote,omitzero"`
 
 	// Sidebar is the setting older versions wrote; false now means two bars.
 	Sidebar *bool `json:"sidebar,omitempty"`
+}
+
+// Remote holds settings for remote mode that only the config file sets.
+type Remote struct {
+	// Launchers maps a run kind (e.g. "offspace-agent") to the absolute
+	// path of the program a remote run of that kind starts. The server only
+	// ever names the kind; nothing it sends becomes part of a command line.
+	Launchers map[string]string `json:"launchers,omitempty"`
 }
 
 // Path is where the settings live: OTMUX_CONFIG if set, otherwise
@@ -182,4 +193,26 @@ func (c *Config) RemoveProfile(name string) {
 		}
 	}
 	c.Workspaces = out
+}
+
+// launcherKind is what a run kind may look like: short, lower case.
+var launcherKind = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,31}$`)
+
+// CheckLauncher reports why path can't be the launcher for kind: kind must
+// be a short lower-case name and path an absolute path to an executable file.
+func CheckLauncher(kind, path string) error {
+	if !launcherKind.MatchString(kind) {
+		return fmt.Errorf("launcher kind %q: use lower-case letters, digits, - and _ (up to 32)", kind)
+	}
+	if !filepath.IsAbs(path) {
+		return fmt.Errorf("launcher for %q must be an absolute path, got %q", kind, path)
+	}
+	st, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("launcher for %q: %v", kind, err)
+	}
+	if !st.Mode().IsRegular() || (runtime.GOOS != "windows" && st.Mode().Perm()&0o111 == 0) {
+		return fmt.Errorf("launcher for %q is not an executable file: %s", kind, path)
+	}
+	return nil
 }

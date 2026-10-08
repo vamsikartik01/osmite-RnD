@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"strconv"
+	"time"
 
 	"github.com/charmbracelet/x/xpty"
 	"golang.org/x/sys/windows"
@@ -48,4 +51,16 @@ func dup(h uintptr) (windows.Handle, error) {
 		return 0, fmt.Errorf("pty: duplicate handle: %w", err)
 	}
 	return d, nil
+}
+
+// KillTree ends the process and its children with taskkill /T: Windows has
+// no process groups to signal, and grace doesn't apply.
+func (p *proc) KillTree(time.Duration) error {
+	if p.cmd.Process == nil {
+		return nil
+	}
+	if err := exec.Command("taskkill", "/T", "/F", "/PID", strconv.Itoa(p.cmd.Process.Pid)).Run(); err != nil {
+		return p.Kill()
+	}
+	return nil
 }

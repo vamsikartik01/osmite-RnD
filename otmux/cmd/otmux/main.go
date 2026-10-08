@@ -42,6 +42,8 @@ Usage:
   otmux restart [-y]        stop the daemon and every shell, then open otmux
                             again (e.g. to start a new version); -y skips asking
   otmux keys                list key bindings
+  otmux launcher [set <kind> <path> | rm <kind>]
+                            list or change remote run launchers (see README)
   otmux update              update otmux to the latest release
   otmux changes [version]   what changed since version (default: this version)
   otmux version
@@ -110,6 +112,8 @@ func run(args []string) error {
 	case "keys":
 		printKeys()
 		return nil
+	case "launcher", "launchers":
+		return launcherCmd(args)
 	case "daemon":
 		return runDaemon()
 	case "version", "--version", "-v":

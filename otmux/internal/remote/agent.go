@@ -59,6 +59,9 @@ type Agent struct {
 	mu      sync.Mutex
 	running *run
 	status  protocol.RemoteStatus
+	runner  Runner
+	pending []RunReport   // run reports not yet sent; see runs.go
+	kick    chan struct{} // pending has something new
 }
 
 // run is one start of remote mode with one account.
@@ -72,7 +75,7 @@ type run struct {
 // connection; onStatus is told about every status change and must not call
 // back into the agent.
 func NewAgent(serve func(net.Conn), onStatus func(protocol.RemoteStatus)) *Agent {
-	return &Agent{serve: serve, onStatus: onStatus, status: protocol.RemoteStatus{State: protocol.RemoteOff}}
+	return &Agent{serve: serve, onStatus: onStatus, status: protocol.RemoteStatus{State: protocol.RemoteOff}, kick: make(chan struct{}, 1)}
 }
 
 // Status returns the current status.
@@ -252,10 +255,12 @@ func (g *Agent) connect(ctx context.Context, a Account) error {
 	c.SetReadLimit(protocol.MaxFrameSize + 4)
 
 	m := machine(a.DeviceID)
+	// Features tells the server what this otmux can do beyond sessions.
 	hello, _ := json.Marshal(struct {
 		Type string `json:"type"`
 		meta
-	}{"hello", m})
+		Features []string `json:"features"`
+	}{"hello", m, []string{"runs"}})
 	hctx, cancel := context.WithTimeout(ctx, helloTimeout)
 	err = c.Write(hctx, websocket.MessageText, hello)
 	cancel()
@@ -269,11 +274,12 @@ func (g *Agent) connect(ctx context.Context, a Account) error {
 
 	m2 := &mux{c: c, ctx: ctx, serve: g.serve, sessions: map[uint32]*session{}, onCount: func(n int) {
 		g.setStatus(func(s *protocol.RemoteStatus) { s.Sessions = n })
-	}}
+	}, onRun: g.onRunMessage}
 	defer m2.closeAll()
 	pctx, stopPing := context.WithCancel(ctx)
 	defer stopPing()
 	go keepAlive(pctx, c, pingInterval, pingTimeout) // read here: tests change them
+	go g.sendReports(pctx, c)
 	err = m2.readLoop()
 	switch websocket.CloseStatus(err) {
 	case closeRevoked:
@@ -314,6 +320,7 @@ type mux struct {
 	ctx     context.Context
 	serve   func(net.Conn)
 	onCount func(int)
+	onRun   func(typ string, data []byte)
 
 	mu       sync.Mutex
 	sessions map[uint32]*session
@@ -349,6 +356,10 @@ func (m *mux) readLoop() error {
 				m.open(msg.Session, msg.User)
 			case "close":
 				m.drop(msg.Session, false, "")
+			case "run", "stop":
+				if m.onRun != nil {
+					m.onRun(msg.Type, data)
+				}
 			}
 			continue
 		}

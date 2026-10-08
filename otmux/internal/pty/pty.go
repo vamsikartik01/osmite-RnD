@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/charmbracelet/x/xpty"
 )
@@ -25,6 +26,9 @@ type PTY interface {
 	Wait() error
 	// Kill terminates the process.
 	Kill() error
+	// KillTree terminates the process and what it started: its process
+	// group on Unix (SIGTERM, then SIGKILL after grace), its tree on Windows.
+	KillTree(grace time.Duration) error
 	// Pid is the process ID of the program started on the PTY.
 	Pid() int
 }

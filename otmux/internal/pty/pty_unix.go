@@ -6,6 +6,7 @@ import (
 	"io"
 	"os/exec"
 	"syscall"
+	"time"
 
 	"github.com/charmbracelet/x/xpty"
 )
@@ -29,3 +30,19 @@ func masterIO(p xpty.Pty) (io.ReadCloser, io.WriteCloser, error) {
 type nopCloser struct{ io.ReadWriter }
 
 func (nopCloser) Close() error { return nil }
+
+// KillTree signals the process group: the process was started in a session
+// of its own (prepareCmd), so its group is everything it started that
+// didn't leave it.
+func (p *proc) KillTree(grace time.Duration) error {
+	if p.cmd.Process == nil {
+		return nil
+	}
+	pid := p.cmd.Process.Pid
+	err := syscall.Kill(-pid, syscall.SIGTERM)
+	go func() {
+		time.Sleep(grace)
+		_ = syscall.Kill(-pid, syscall.SIGKILL)
+	}()
+	return err
+}

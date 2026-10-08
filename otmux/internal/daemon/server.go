@@ -49,6 +49,7 @@ type Server struct {
 	// is on; remoteStatus is its last status, for State.
 	remote       *remote.Agent
 	remoteStatus protocol.RemoteStatus
+	runs         map[string]*remoteRun // by run id; see runs.go
 
 	shutdownOnce sync.Once
 	done         chan struct{}
@@ -72,8 +73,9 @@ func Run() error {
 	if err != nil {
 		return fmt.Errorf("listen %s: %w", path, err)
 	}
-	s := &Server{ln: ln, workspaces: map[string]*Workspace{}, done: make(chan struct{})}
+	s := &Server{ln: ln, workspaces: map[string]*Workspace{}, runs: map[string]*remoteRun{}, done: make(chan struct{})}
 	s.remote = remote.NewAgent(func(nc net.Conn) { s.serve(protocol.NewConn(nc), true) }, s.setRemoteStatus)
+	s.remote.SetRunner(s)
 	s.remoteStatus = s.remote.Status()
 	go s.remote.Reload()
 	go s.watchAgents()
@@ -453,6 +455,9 @@ func (s *Server) handle(c *client, f protocol.Frame) {
 		if p == nil {
 			return
 		}
+		if p.finished { // a finished run's pane: nothing left to type to
+			return
+		}
 		if in.Mouse != nil && in.Mouse.Kind == protocol.MouseWheel {
 			s.wheel(c, p, in)
 			return
@@ -512,9 +517,15 @@ func (s *Server) command(c *client, cmd protocol.Command) {
 			s.selectTab(ws, i)
 		}
 	case protocol.ActionCloseTab:
-		// Each pane's wait goroutine notices its exit and cleans up.
+		// Each pane's wait goroutine notices its exit and cleans up;
+		// finished runs' panes have no process left, so go now.
 		for _, p := range tab.panes {
-			_ = p.pty.Kill()
+			if p.finished {
+				s.paneExited(p)
+			} else {
+				p.closing = true
+				_ = p.pty.Kill()
+			}
 		}
 		return
 	case protocol.ActionRenameTab:
@@ -572,7 +583,12 @@ func (s *Server) command(c *client, cmd protocol.Command) {
 			}
 		}
 	case protocol.ActionClosePane:
-		_ = tab.activePane().pty.Kill()
+		if p := tab.activePane(); p.finished {
+			s.paneExited(p)
+		} else {
+			p.closing = true
+			_ = p.pty.Kill()
+		}
 		return
 	case protocol.ActionZoom:
 		if len(tab.panes) > 1 || tab.zoomed {
@@ -752,15 +768,24 @@ func shellDir(ws *Workspace) string {
 // newTab starts a shell in a new tab placed after the active one, and makes
 // it active. The caller broadcasts the change.
 func (s *Server) newTab(ws *Workspace, name string) error {
+	_, err := s.newTabWith(ws, name, platform.Shell(), shellDir(ws), nil, nil)
+	return err
+}
+
+// newTabWith is newTab running argv in dir with env added. init, if set,
+// runs on the pane before it starts being read.
+func (s *Server) newTabWith(ws *Workspace, name string, argv []string, dir string, env []string, init func(*Pane)) (*Tab, error) {
 	name = truncate(strings.TrimSpace(name), 30)
 	if name == "" {
 		name = randomTabName(ws)
 	}
-	argv := platform.Shell()
 	area := ws.area()
-	p, err := newPane(s.newID(), argv, shellDir(ws), area.W, area.H)
+	p, err := newPane(s.newID(), argv, dir, area.W, area.H, env...)
 	if err != nil {
-		return err
+		return nil, err
+	}
+	if init != nil {
+		init(p)
 	}
 	t := &Tab{id: s.newID(), name: name, tree: layout.New(p.id), panes: map[uint32]*Pane{p.id: p}, active: p.id}
 	at := 0
@@ -770,7 +795,7 @@ func (s *Server) newTab(ws *Workspace, name string) error {
 	ws.tabs = append(ws.tabs[:at], append([]*Tab{t}, ws.tabs[at:]...)...)
 	ws.active = at
 	s.startPane(ws, t, p)
-	return nil
+	return t, nil
 }
 
 // splitPane splits the tab's focused pane and focuses the new one.
@@ -802,11 +827,25 @@ func (s *Server) startPane(ws *Workspace, t *Tab, p *Pane) {
 	go func() {
 		err := p.pty.Wait()
 		log.Printf("pane %d exited: %v", p.id, err)
+		if p.run != nil {
+			// Let the last of the run's output land before its exit note.
+			// On Unix the PTY often stays readable after the process exits,
+			// so this usually waits the whole half second.
+			select {
+			case <-p.pumped:
+			case <-time.After(500 * time.Millisecond):
+			}
+		}
 		// On Windows the ConPTY output pipe stays open until the pseudo
 		// console is closed, so close it to unblock pumpOutput.
 		_ = p.pty.Close()
 		s.mu.Lock()
-		s.paneExited(p)
+		if p.run != nil {
+			s.runFinished(p, exitCode(err))
+		}
+		if !p.finished { // a run's pane stays, unless the user closed it
+			s.paneExited(p)
+		}
 		s.mu.Unlock()
 	}()
 }
@@ -820,6 +859,7 @@ func (p *Pane) visible() bool {
 // pumpOutput feeds PTY output into the pane's emulator and forwards it to
 // clients viewing the pane.
 func (s *Server) pumpOutput(p *Pane) {
+	defer close(p.pumped)
 	buf := make([]byte, 32<<10)
 	for {
 		n, err := p.pty.Read(buf)

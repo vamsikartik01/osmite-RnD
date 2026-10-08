@@ -47,6 +47,14 @@ type Pane struct {
 	typed        bool      // the user has typed or pasted into the pane
 	exited       bool
 
+	// run is set when the pane runs a remote run's launcher (runs.go). Its
+	// pane stays after the process exits (finished), showing the output,
+	// until the user closes it.
+	run      *remoteRun
+	finished bool
+	closing  bool          // the user closed it while its run was live
+	pumped   chan struct{} // closed when pumpOutput has read everything
+
 	// Output held back to send as whole updates; see batch.go.
 	pending    []byte
 	flushArmed bool
@@ -56,7 +64,7 @@ type Pane struct {
 	frameEnded bool      // an update ended since the last flush
 }
 
-func newPane(id uint32, argv []string, dir string, cols, rows int) (*Pane, error) {
+func newPane(id uint32, argv []string, dir string, cols, rows int, env ...string) (*Pane, error) {
 	if dir != "" {
 		if st, err := os.Stat(dir); err != nil || !st.IsDir() {
 			dir = ""
@@ -65,14 +73,14 @@ func newPane(id uint32, argv []string, dir string, cols, rows int) (*Pane, error
 	p, err := pty.Start(pty.Options{
 		Argv: argv,
 		Dir:  dir,
-		Env:  []string{fmt.Sprintf("OTMUX_PANE=%d", id)},
+		Env:  append([]string{fmt.Sprintf("OTMUX_PANE=%d", id)}, env...),
 		Cols: cols,
 		Rows: rows,
 	})
 	if err != nil {
 		return nil, err
 	}
-	pane := &Pane{id: id, pty: p, emu: vt.NewEmulator(cols, rows), cols: cols, rows: rows, mouseModes: map[ansi.Mode]bool{}}
+	pane := &Pane{id: id, pty: p, emu: vt.NewEmulator(cols, rows), cols: cols, rows: rows, mouseModes: map[ansi.Mode]bool{}, pumped: make(chan struct{})}
 	if len(argv) > 0 {
 		pane.program = strings.TrimSuffix(filepath.Base(argv[0]), filepath.Ext(argv[0]))
 	}
