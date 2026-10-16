@@ -5,13 +5,13 @@ go 1.26.0
 require (
 	github.com/atotto/clipboard v0.1.4
 	github.com/charmbracelet/ultraviolet v0.0.0-20261001125412-878653296cfd
-	github.com/charmbracelet/x/ansi v0.11.8
+	github.com/charmbracelet/x/ansi v0.11.9
 	github.com/charmbracelet/x/term v0.2.2
-	github.com/charmbracelet/x/vt v0.0.0-20261001101533-953920dd3285
+	github.com/charmbracelet/x/vt v0.1.0
 	github.com/charmbracelet/x/xpty v0.1.4
 	github.com/coder/websocket v1.8.15
-	github.com/mattn/go-runewidth v0.0.30
-	golang.org/x/sys v0.47.0
+	github.com/mattn/go-runewidth v0.0.31
+	golang.org/x/sys v0.49.0
 )
 
 require (
